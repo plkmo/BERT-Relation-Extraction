@@ -1,0 +1,10 @@
+*.tar
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.pth
+*.pyc
+/data/*
+/__pycache__/*
