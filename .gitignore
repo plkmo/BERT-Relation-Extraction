@@ -6,5 +6,6 @@
 *.tiff
 *.pth
 *.pyc
+*.pkl
 /data/*
 /__pycache__/*
