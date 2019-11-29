@@ -42,7 +42,7 @@ def train_and_fit(args):
     '''
     
     logger.info("FREEZING MOST HIDDEN LAYERS...")
-    unfrozen_layers = ["classifier", "bert.pooler", "bert.encoder.layer.11"]
+    unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear"]
     for name, param in net.named_parameters():
         if not any([layer in name for layer in unfrozen_layers]):
             print("[FROZE]: %s" % name)
@@ -52,7 +52,7 @@ def train_and_fit(args):
             param.requires_grad = True
        
     criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id)
-    optimizer = optim.Adam([{"params":net.encoder.parameters(), "lr": args.lr}])
+    optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
     
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20,40,80,120,150,180,200], gamma=0.8)
     
