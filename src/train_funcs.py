@@ -25,14 +25,23 @@ class Two_Headed_Loss(nn.Module):
         super(Two_Headed_Loss, self).__init__()
         self.lm_ignore_idx = lm_ignore_idx
         self.LM_criterion = nn.CrossEntropyLoss(ignore_index=self.lm_ignore_idx)
+        self.BCE_criterion = nn.BCELoss(reduction='mean')
     
     def p_(self, f1_vec, f2_vec):
         p = 1/(1 + math.exp(torch.dot(f1_vec, f2_vec)))
         return p
     
-    def forward(self, lm_logits, f1_vec, f2_vec, e1, e2, e11, e22, tokenizer):
-        
-        return
+    def forward(self, lm_logits, blank_logits, lm_labels, blank_labels):
+        '''
+        lm_logits: (batch_size, sequence_length, hidden_size)
+        lm_labels: (batch_size, sequence_length, label_idxs)
+        blank_logits: (batch_size, probabilities)
+        blank_labels: (batch_size, 0 or 1)
+        '''
+        lm_loss = self.LM_criterion(lm_logits, lm_labels)
+        blank_loss = self.BCE_criterion(blank_logits, blank_labels)
+        total_loss = lm_loss + blank_loss
+        return total_loss
 
 def load_state(net, optimizer, scheduler, args, load_best=False):
     """ Loads saved model and optimizer states if exists """

@@ -10,6 +10,7 @@ import re
 import spacy
 import math
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
@@ -18,6 +19,7 @@ from .misc import save_as_pickle, load_pickle
 from tqdm import tqdm
 import logging
 
+tqdm.pandas(desc="prog_bar")
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
                     datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
 logger = logging.getLogger('__file__')
@@ -116,10 +118,16 @@ def create_pretraining_corpus(raw_text, window_size=40):
     return D
 
 class pretrain_dataset(Dataset):
-    def __init__(self, D):
+    def __init__(self, D, batch_size=None):
+        self.internal_batching = True
+        self.batch_size = batch_size # batch_size cannot be None if internal_batching == True
         self.alpha = 0.7
         self.mask_probability = 0.15
-        self.D = D
+        
+        self.df = pd.DataFrame(D, columns=['r','e1','e2'])
+        self.e1s = list(self.df['e1'].unique())
+        self.e2s = list(self.df['e2'].unique())
+        
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
         self.cls_token = self.tokenizer.cls_token
@@ -128,6 +136,14 @@ class pretrain_dataset(Dataset):
         self.E1s_token_id = self.tokenizer.encode("[/E1]")[1:-1][0]
         self.E2_token_id = self.tokenizer.encode("[E2]")[1:-1][0]
         self.E2s_token_id = self.tokenizer.encode("[/E2]")[1:-1][0]
+        self.PS = Pad_Sequence(seq_pad_value=self.tokenizer.pad_token_id,\
+                               label_pad_value=self.tokenizer.pad_token_id,\
+                               label2_pad_value=-1,\
+                               label3_pad_value=-1,\
+                               label4_pad_value=-1)
+        
+        save_as_pickle("BERT_tokenizer.pkl", self.tokenizer)
+        logger.info("Saved BERT tokenizer at ./data/BERT_tokenizer.pkl")
         
     def put_blanks(self, D):
         blank_e1 = np.random.uniform()
@@ -185,15 +201,73 @@ class pretrain_dataset(Dataset):
         return x, masked_for_pred, e1_e2_start, e1, e2
     
     def __len__(self):
-        return len(self.D)
+        return len(self.df)
     
     def __getitem__(self, idx):
-        x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks(self.D[idx]))
-        x = torch.tensor(x)
-        masked_for_pred = torch.tensor(masked_for_pred)
-        e1_e2_start = torch.tensor(e1_e2_start)
-        e1, e2 = torch.tensor(e1), torch.tensor(e2)
-        return x, masked_for_pred, e1_e2_start, e1, e2
+        ### implements standard batching
+        if not self.internal_batching:
+            r, e1, e2 = self.df.iloc[idx]
+            x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+            x = torch.tensor(x)
+            masked_for_pred = torch.tensor(masked_for_pred)
+            e1_e2_start = torch.tensor(e1_e2_start)
+            e1, e2 = torch.tensor(e1), torch.tensor(e2)
+            return x, masked_for_pred, e1_e2_start, e1, e2
+        
+        ### implements noise contrastive estimation
+        else:
+            r, e1, e2 = self.df.iloc[idx] # positive sample
+            
+            ### get negative samples
+            if np.random.uniform() > 0.5:
+                '''
+                choose from option: 
+                1) sampling uniformly from all negatives
+                2) sampling uniformly from negatives that share e1 or e2
+                '''
+                pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
+                neg_idxs = np.random.choice(pool, \
+                                            size=min((self.batch_size - 1), len(pool)), replace=False)
+                Q = 1/len(pool)
+            
+            else:
+                if np.random.uniform() > 0.5: # share e1 but not e2
+                    pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] != e2))].index
+                    neg_idxs = np.random.choice(pool, \
+                                                size=min((self.batch_size - 1), len(pool)), replace=False)
+                    Q = 1/len(pool)
+                else: # share e2 but not e1
+                    pool = self.df[((self.df['e1'] != e1) & (self.df['e2'] == e2))].index
+                    neg_idxs = np.random.choice(pool, \
+                                                size=min((self.batch_size - 1), len(pool)), replace=False)
+                    Q = 1/len(pool)
+                    
+                if len(neg_idxs) == 0: # if empty, sample from all negatives
+                    pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
+                    neg_idxs = np.random.choice(pool, \
+                                            size=min((self.batch_size - 1), len(pool)), replace=False)
+                    Q = 1/len(pool)
+            
+            ## process positive sample
+            x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+            x = torch.tensor(x)
+            masked_for_pred = torch.tensor(masked_for_pred)
+            e1_e2_start = torch.tensor(e1_e2_start)
+            e1, e2 = torch.tensor(e1), torch.tensor(e2)
+            batch = [(x, masked_for_pred, e1_e2_start, torch.tensor([0]).long(), torch.tensor([1]).long())]
+            
+            ## process negative samples
+            negs_df = self.df.loc[neg_idxs]
+            for idx, row in negs_df.iterrows():
+                r, e1, e2 = row[0], row[1], row[2]
+                x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+                x = torch.tensor(x)
+                masked_for_pred = torch.tensor(masked_for_pred)
+                e1_e2_start = torch.tensor(e1_e2_start)
+                e1, e2 = torch.tensor(e1), torch.tensor(e2)
+                batch.append((x, masked_for_pred, e1_e2_start, torch.tensor([Q]), torch.tensor([0]).long()))
+            batch = self.PS(batch)
+            return batch
     
 class Pad_Sequence():
     """
@@ -229,7 +303,7 @@ class Pad_Sequence():
         labels4 = list(map(lambda x: x[4], sorted_batch))
         labels4_padded = pad_sequence(labels4, batch_first=True, padding_value=self.label4_pad_value)
         y4_lengths = torch.LongTensor([len(x) for x in labels4])
-        return seqs_padded, labels_padded, labels2_padded, labels3_padded, labels4_padded, \
+        return seqs_padded, labels_padded, labels2_padded, labels3_padded, labels4_padded,\
                 x_lengths, y_lengths, y2_lengths, y3_lengths, y4_lengths
 
 def load_dataloaders(args, max_length=50000):
@@ -255,7 +329,9 @@ def load_dataloaders(args, max_length=50000):
         logger.info("Loaded pre-training data from saved file")
         D = load_pickle("D.pkl")
         
-    train_set = pretrain_dataset(D)
+    train_set = pretrain_dataset(D, batch_size=args.batch_size)
+    train_length = len(train_set)
+    '''
     PS = Pad_Sequence(seq_pad_value=train_set.tokenizer.pad_token_id,\
                       label_pad_value=train_set.tokenizer.pad_token_id,\
                       label2_pad_value=-1,\
@@ -263,4 +339,5 @@ def load_dataloaders(args, max_length=50000):
                       label4_pad_value=-1)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, \
                               num_workers=0, collate_fn=PS, pin_memory=False)
-    return D, train_loader, train_set
+    '''
+    return train_set

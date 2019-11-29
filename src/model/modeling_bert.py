@@ -627,7 +627,8 @@ class BertModel(BertPreTrainedModel):
             self.encoder.layer[layer].attention.prune_heads(heads)
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None,
-                head_mask=None, inputs_embeds=None, encoder_hidden_states=None, encoder_attention_mask=None):
+                head_mask=None, inputs_embeds=None, encoder_hidden_states=None, encoder_attention_mask=None, \
+                Q=None, e1_e2_start=None):
         """ Forward pass on the Model.
 
         The model can behave as an encoder (with only self-attention) as well
@@ -719,9 +720,19 @@ class BertModel(BertPreTrainedModel):
                                        encoder_attention_mask=encoder_extended_attention_mask)
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
+        
+        ### two heads: LM and blanks ###
+        blankv1v2 = sequence_output[:, e1_e2_start, :]
+        buffer = []
+        for i in range(blankv1v2.shape[0]): # iterate batch & collect
+            v1v2 = blankv1v2[i, i, :, :]
+            v1v2 = torch.cat((v1v2[0], v1v2[1]))
+            buffer.append(v1v2)
+        del blankv1v2
+        v1v2 = torch.stack([a for a in buffer], dim=0)
 
         outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
-        return outputs  # sequence_output, pooled_output, (hidden_states), (attentions)
+        return outputs, v1v2  # sequence_output, pooled_output, (hidden_states), (attentions)
 
 
 @add_start_docstrings("""Bert Model with two heads on top as done during the pre-training:
