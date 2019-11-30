@@ -254,7 +254,7 @@ class pretrain_dataset(Dataset):
             masked_for_pred = torch.tensor(masked_for_pred)
             e1_e2_start = torch.tensor(e1_e2_start)
             e1, e2 = torch.tensor(e1), torch.tensor(e2)
-            batch = [(x, masked_for_pred, e1_e2_start, torch.tensor([0]).long(), torch.tensor([1]).long())]
+            batch = [(x, masked_for_pred, e1_e2_start, torch.tensor([0]).long(), torch.tensor([1]))]
             
             ## process negative samples
             negs_df = self.df.loc[neg_idxs]
@@ -265,7 +265,7 @@ class pretrain_dataset(Dataset):
                 masked_for_pred = torch.tensor(masked_for_pred)
                 e1_e2_start = torch.tensor(e1_e2_start)
                 e1, e2 = torch.tensor(e1), torch.tensor(e2)
-                batch.append((x, masked_for_pred, e1_e2_start, torch.tensor([Q]), torch.tensor([0]).long()))
+                batch.append((x, masked_for_pred, e1_e2_start, torch.tensor([Q]), torch.tensor([0])))
             batch = self.PS(batch)
             return batch
     

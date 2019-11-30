@@ -42,7 +42,7 @@ def train_and_fit(args):
     '''
     
     logger.info("FREEZING MOST HIDDEN LAYERS...")
-    unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear"]
+    unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
     for name, param in net.named_parameters():
         if not any([layer in name for layer in unfrozen_layers]):
             print("[FROZE]: %s" % name)
@@ -61,26 +61,30 @@ def train_and_fit(args):
     
     logger.info("Starting training process...")
     pad_id = tokenizer.pad_token_id
+    mask_id = tokenizer.mask_token_id
     update_size = len(train_loader)//10
     for epoch in range(start_epoch, args.num_epochs):
         net.train(); total_loss = 0.0; losses_per_batch = []
         for i, data in enumerate(train_loader, 0):
             x, masked_for_pred, e1_e2_start, Q, blank_labels, _,_,_,_,_ = data
+            masked_for_pred = masked_for_pred[(masked_for_pred != pad_id)]
             attention_mask = (x != pad_id).float()
             token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
 
             if cuda:
-                x = x.cuda(); masked_for_pred = masked_for_pred.cuda(); Q = Q.cuda()
-                blank_labels = blank_labels.cuda()
+                x = x.cuda(); masked_for_pred = masked_for_pred.cuda(); Q = Q.cuda().float()
+                blank_labels = blank_labels.cuda().float()
                 attention_mask = attention_mask.cuda()
                 token_type_ids = token_type_ids.cuda()
                 
             x = x.long()
-            outputs = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=Q,\
+            blanks_logits, lm_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=Q,\
                           e1_e2_start=e1_e2_start)
-            return outputs # for debugging now
+            lm_logits = lm_logits[(x == mask_id)]
+            
+            #return lm_logits, blanks_logits, masked_for_pred, blank_labels # for debugging now
         
-            loss = criterion(lm_logits, blank_logits, lm_labels, blank_labels)
+            loss = criterion(lm_logits, blanks_logits, masked_for_pred, blank_labels)
             loss = loss/args.gradient_acc_steps
             loss.backward()
             clip_grad_norm_(net.parameters(), args.max_norm)
@@ -95,10 +99,13 @@ def train_and_fit(args):
                       (epoch + 1, (i + 1)*args.batch_size, train_len, losses_per_batch[-1]))
                 total_loss = 0.0
         losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))
+        '''
         if args.train_test_split == 1:
             accuracy_per_epoch.append(model_eval(net, test_loader, cuda=cuda))
         else:
             accuracy_per_epoch.append(model_eval(net, train_loader, cuda=cuda))
+        '''
+        accuracy_per_epoch.append(0)
         print("Losses at Epoch %d: %.7f" % (epoch + 1, losses_per_epoch[-1]))
         print("Accuracy at Epoch %d: %.7f" % (epoch + 1, accuracy_per_epoch[-1]))
         if accuracy_per_epoch[-1] > best_pred:

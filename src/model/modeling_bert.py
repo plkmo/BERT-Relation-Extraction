@@ -617,7 +617,9 @@ class BertModel(BertPreTrainedModel):
         self.sigmoid = nn.Sigmoid()
         
         ### LM head ###
-        self.lm_linear = nn.Linear(768, self.config.vocab_size)
+        self.cls = BertOnlyMLMHead(config)
+        #self.lm_linear = nn.Linear(768, self.config.vocab_size)
+        #self.lm_bias = nn.Parameter(torch.zeros(config.vocab_size))
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -740,10 +742,10 @@ class BertModel(BertPreTrainedModel):
         del buffer
 
         blanks_logits = self.sigmoid(self.blanks_linear(v1v2) - torch.log(Q))
-        lm_logits = self.lm_linear(sequence_output)
+        lm_logits = self.cls(sequence_output)
 
-        outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
-        return outputs, blanks_logits, lm_logits  # sequence_output, pooled_output, (hidden_states), (attentions)
+        #outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
+        return blanks_logits, lm_logits  # sequence_output, pooled_output, (hidden_states), (attentions)
 
 
 @add_start_docstrings("""Bert Model with two heads on top as done during the pre-training:

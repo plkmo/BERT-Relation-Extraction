@@ -46,4 +46,4 @@ if __name__ == "__main__":
     e1_e2_start = data[2]
     '''
     
-    output = train_and_fit(args)
+    lm_logits, blanks_logits, masked_for_pred, blank_labels = train_and_fit(args)
