@@ -26,21 +26,14 @@ def train_and_fit(args):
     
     train_loader = load_dataloaders(args)
     train_len = len(train_loader)
+    logger.info("Loaded %d pre-training samples." % train_len)
     
     net = BertModel.from_pretrained('bert-base-uncased', force_download=False)
     tokenizer = load_pickle("BERT_tokenizer.pkl")
     net.resize_token_embeddings(len(tokenizer)) 
     if cuda:
         net.cuda()
-    
-    ''' 
-    ### freeze all layers except for last encoder layer and classifier layer
-    logger.info("FREEZING MOST HIDDEN LAYERS...")
-    for name, param in net.named_parameters():
-        if ("classifier" not in name) and ("bert.pooler" not in name) and ("bert.encoder.layer.11" not in name):
-            param.requires_grad = False
-    '''
-    
+        
     logger.info("FREEZING MOST HIDDEN LAYERS...")
     unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
     for name, param in net.named_parameters():
@@ -54,7 +47,8 @@ def train_and_fit(args):
     criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id)
     optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
     
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20,40,80,120,150,180,200], gamma=0.8)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2,4,6,8,12,15,18,20,22,\
+                                                                      24,26,30], gamma=0.8)
     
     start_epoch, best_pred = load_state(net, optimizer, scheduler, args, load_best=False)    
     losses_per_epoch, accuracy_per_epoch = load_results(args.model_no)
@@ -96,7 +90,7 @@ def train_and_fit(args):
             if (i % update_size) == (update_size - 1):    # print every 100 mini-batches of size = batch_size
                 losses_per_batch.append(args.gradient_acc_steps*total_loss/update_size)
                 print('[Epoch: %d, %5d/ %d points] total loss per batch: %.3f' %
-                      (epoch + 1, (i + 1)*args.batch_size, train_len, losses_per_batch[-1]))
+                      (epoch + 1, (i + 1), train_len, losses_per_batch[-1]))
                 total_loss = 0.0
         losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))
         '''
@@ -105,7 +99,7 @@ def train_and_fit(args):
         else:
             accuracy_per_epoch.append(model_eval(net, train_loader, cuda=cuda))
         '''
-        accuracy_per_epoch.append(0)
+        accuracy_per_epoch.append(0) # placeholder
         print("Losses at Epoch %d: %.7f" % (epoch + 1, losses_per_epoch[-1]))
         print("Accuracy at Epoch %d: %.7f" % (epoch + 1, accuracy_per_epoch[-1]))
         if accuracy_per_epoch[-1] > best_pred:
@@ -146,3 +140,5 @@ def train_and_fit(args):
     ax2.set_ylabel("Test Accuracy", fontsize=22)
     ax2.set_title("Test Accuracy vs Epoch", fontsize=32)
     plt.savefig(os.path.join("./data/" ,"accuracy_vs_epoch_%d.png" % args.model_no))
+    
+    return net

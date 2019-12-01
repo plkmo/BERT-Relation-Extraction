@@ -98,7 +98,9 @@ def create_pretraining_corpus(raw_text, window_size=40):
                     while not punc_token:
                         punc_token = sents_doc[start].is_punct
                         start += 1
-                    right_r = start
+                        if start == length_doc:
+                            break
+                    right_r = start if start < length_doc else length_doc
                 else:
                     right_r = length_doc
                 x = [token.text for token in sents_doc[left_r:right_r]]
@@ -219,12 +221,12 @@ class pretrain_dataset(Dataset):
             r, e1, e2 = self.df.iloc[idx] # positive sample
             
             ### get negative samples
-            if np.random.uniform() > 0.5:
-                '''
-                choose from option: 
-                1) sampling uniformly from all negatives
-                2) sampling uniformly from negatives that share e1 or e2
-                '''
+            '''
+            choose from option: 
+            1) sampling uniformly from all negatives
+            2) sampling uniformly from negatives that share e1 or e2
+            '''
+            if np.random.uniform() > 0.5:   
                 pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
                 neg_idxs = np.random.choice(pool, \
                                             size=min((self.batch_size - 1), len(pool)), replace=False)
@@ -235,18 +237,17 @@ class pretrain_dataset(Dataset):
                     pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] != e2))].index
                     neg_idxs = np.random.choice(pool, \
                                                 size=min((self.batch_size - 1), len(pool)), replace=False)
-                    Q = 1/len(pool)
+
                 else: # share e2 but not e1
                     pool = self.df[((self.df['e1'] != e1) & (self.df['e2'] == e2))].index
                     neg_idxs = np.random.choice(pool, \
                                                 size=min((self.batch_size - 1), len(pool)), replace=False)
-                    Q = 1/len(pool)
                     
                 if len(neg_idxs) == 0: # if empty, sample from all negatives
                     pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
                     neg_idxs = np.random.choice(pool, \
                                             size=min((self.batch_size - 1), len(pool)), replace=False)
-                    Q = 1/len(pool)
+                Q = 1/len(pool)
             
             ## process positive sample
             x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
@@ -312,8 +313,8 @@ def load_dataloaders(args, max_length=50000):
         logger.info("Loading pre-training data...")
         with open(args.pretrain_data, "r", encoding="utf8") as f:
             text = f.readlines()
-        text = text[:500] # restrict size for testing
         
+        #text = text[:500] # restrict size for testing
         text = process_textlines(text)
         
         logger.info("Length of text (characters): %d" % len(text))
@@ -332,6 +333,7 @@ def load_dataloaders(args, max_length=50000):
     train_set = pretrain_dataset(D, batch_size=args.batch_size)
     train_length = len(train_set)
     '''
+    # if using fixed batching
     PS = Pad_Sequence(seq_pad_value=train_set.tokenizer.pad_token_id,\
                       label_pad_value=train_set.tokenizer.pad_token_id,\
                       label2_pad_value=-1,\
