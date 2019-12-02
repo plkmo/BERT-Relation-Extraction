@@ -314,7 +314,7 @@ def load_dataloaders(args, max_length=50000):
         with open(args.pretrain_data, "r", encoding="utf8") as f:
             text = f.readlines()
         
-        #text = text[:500] # restrict size for testing
+        #text = text[:1500] # restrict size for testing
         text = process_textlines(text)
         
         logger.info("Length of text (characters): %d" % len(text))
@@ -322,7 +322,7 @@ def load_dataloaders(args, max_length=50000):
         logger.info("Splitting into %d max length chunks of size %d" % (num_chunks, max_length))
         text_chunks = (text[i*max_length:(i*max_length + max_length)] for i in range(num_chunks))
         D = []
-        for text_chunk in tqdm(text_chunks,):
+        for text_chunk in tqdm(text_chunks, total=num_chunks):
             D.extend(create_pretraining_corpus(text_chunk, window_size=40))
         save_as_pickle("D.pkl", D)
         logger.info("Saved pre-training corpus to %s" % "./data/D.pkl")

@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
     parser.add_argument("--gradient_acc_steps", type=int, default=1, help="No. of steps of gradient accumulation")
     parser.add_argument("--max_norm", type=float, default=1.0, help="Clipped gradient norm")
+    parser.add_argument("--fp16", type=int, default=0, help="1: use mixed precision ; 0: use floating point 32") # mixed precision doesn't seem to train well
     parser.add_argument("--num_epochs", type=int, default=40, help="No of epochs")
     parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
     parser.add_argument("--model_no", type=int, default=0, help="Model ID")
