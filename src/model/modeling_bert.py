@@ -602,24 +602,29 @@ class BertModel(BertPreTrainedModel):
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
     """
-    def __init__(self, config):
+    def __init__(self, config, task=None, n_classes_=None):
         super(BertModel, self).__init__(config)
         self.config = config
-
+        
+        self.task = task
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
         self.pooler = BertPooler(config)
 
         self.init_weights()
         
-        ### blanks head ###
-        self.blanks_linear = nn.Linear(1536, 1)
-        self.sigmoid = nn.Sigmoid()
-        
-        ### LM head ###
-        self.cls = BertOnlyMLMHead(config)
-        #self.lm_linear = nn.Linear(768, self.config.vocab_size)
-        #self.lm_bias = nn.Parameter(torch.zeros(config.vocab_size))
+        if self.task is None:
+            ### blanks head ###
+            self.blanks_linear = nn.Linear(1536, 1)
+            self.sigmoid = nn.Sigmoid()
+            
+            ### LM head ###
+            self.cls = BertOnlyMLMHead(config)
+            #self.lm_linear = nn.Linear(768, self.config.vocab_size)
+            #self.lm_bias = nn.Parameter(torch.zeros(config.vocab_size))
+        elif self.task == 'classification':
+            self.n_classes_ = n_classes_
+            self.classification_layer = nn.Linear(1536, n_classes_)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -740,12 +745,18 @@ class BertModel(BertPreTrainedModel):
         del blankv1v2
         v1v2 = torch.stack([a for a in buffer], dim=0)
         del buffer
-
-        blanks_logits = self.sigmoid(self.blanks_linear(v1v2) - torch.log(Q))
-        lm_logits = self.cls(sequence_output)
+        
+        if self.task is None:
+            blanks_logits = self.sigmoid(self.blanks_linear(v1v2) - torch.log(Q))
+            lm_logits = self.cls(sequence_output)
+            return blanks_logits, lm_logits
+        
+        elif self.task == 'classification':
+            classification_logits = self.classification_layer(v1v2)
+            return classification_logits
 
         #outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
-        return blanks_logits, lm_logits  # sequence_output, pooled_output, (hidden_states), (attentions)
+        
 
 
 @add_start_docstrings("""Bert Model with two heads on top as done during the pre-training:

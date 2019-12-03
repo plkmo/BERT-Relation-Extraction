@@ -15,6 +15,7 @@ from .preprocessing_funcs import load_dataloaders
 from .train_funcs import Two_Headed_Loss, load_state, load_results, evaluate_
 from .misc import save_as_pickle, load_pickle
 import matplotlib.pyplot as plt
+import time
 import logging
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
@@ -73,6 +74,7 @@ def train_and_fit(args):
     mask_id = tokenizer.mask_token_id
     update_size = len(train_loader)//10
     for epoch in range(start_epoch, args.num_epochs):
+        start_time = time.time()
         net.train(); total_loss = 0.0; losses_per_batch = []; total_acc = 0.0; lm_accuracy_per_batch = []
         for i, data in enumerate(train_loader, 0):
             x, masked_for_pred, e1_e2_start, Q, blank_labels, _,_,_,_,_ = data
@@ -125,6 +127,7 @@ def train_and_fit(args):
         scheduler.step()
         losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))
         accuracy_per_epoch.append(sum(lm_accuracy_per_batch)/len(lm_accuracy_per_batch))
+        print("Epoch finished, took %.2f seconds." % (time.time() - start_time))
         print("Losses at Epoch %d: %.7f" % (epoch + 1, losses_per_epoch[-1]))
         print("Accuracy at Epoch %d: %.7f" % (epoch + 1, accuracy_per_epoch[-1]))
         

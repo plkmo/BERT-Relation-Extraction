@@ -10,6 +10,7 @@ import math
 import torch
 import torch.nn as nn
 from .misc import save_as_pickle, load_pickle
+from seqeval.metrics import precision_score, recall_score, f1_score
 import logging
 from tqdm import tqdm
 
@@ -17,38 +18,12 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
                     datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
 logger = logging.getLogger(__file__)
 
-class Two_Headed_Loss(nn.Module):
-    '''
-    Implements LM Loss and matching-the-blanks loss concurrently
-    '''
-    def __init__(self, lm_ignore_idx):
-        super(Two_Headed_Loss, self).__init__()
-        self.lm_ignore_idx = lm_ignore_idx
-        self.LM_criterion = nn.CrossEntropyLoss(ignore_index=self.lm_ignore_idx)
-        self.BCE_criterion = nn.BCELoss(reduction='mean')
-    
-    def p_(self, f1_vec, f2_vec):
-        p = 1/(1 + math.exp(torch.dot(f1_vec, f2_vec)))
-        return p
-    
-    def forward(self, lm_logits, blank_logits, lm_labels, blank_labels):
-        '''
-        lm_logits: (batch_size, sequence_length, hidden_size)
-        lm_labels: (batch_size, sequence_length, label_idxs)
-        blank_logits: (batch_size, probabilities)
-        blank_labels: (batch_size, 0 or 1)
-        '''
-        lm_loss = self.LM_criterion(lm_logits, lm_labels)
-        blank_loss = self.BCE_criterion(blank_logits, blank_labels)
-        total_loss = lm_loss + blank_loss
-        return total_loss
-
 def load_state(net, optimizer, scheduler, args, load_best=False):
     """ Loads saved model and optimizer states if exists """
     base_path = "./data/"
     amp_checkpoint = None
-    checkpoint_path = os.path.join(base_path,"test_checkpoint_%d.pth.tar" % args.model_no)
-    best_path = os.path.join(base_path,"test_model_best_%d.pth.tar" % args.model_no)
+    checkpoint_path = os.path.join(base_path,"task_test_checkpoint_%d.pth.tar" % args.model_no)
+    best_path = os.path.join(base_path,"task_test_model_best_%d.pth.tar" % args.model_no)
     start_epoch, best_pred, checkpoint = 0, 0, None
     if (load_best == True) and os.path.isfile(best_path):
         checkpoint = torch.load(best_path)
@@ -70,38 +45,66 @@ def load_state(net, optimizer, scheduler, args, load_best=False):
 
 def load_results(model_no=0):
     """ Loads saved results if exists """
-    losses_path = "./data/test_losses_per_epoch_%d.pkl" % model_no
-    accuracy_path = "./data/test_accuracy_per_epoch_%d.pkl" % model_no
-    if os.path.isfile(losses_path) and os.path.isfile(accuracy_path):
-        losses_per_epoch = load_pickle("test_losses_per_epoch_%d.pkl" % model_no)
-        accuracy_per_epoch = load_pickle("test_accuracy_per_epoch_%d.pkl" % model_no)
+    losses_path = "./data/task_test_losses_per_epoch_%d.pkl" % model_no
+    accuracy_path = "./data/task_train_accuracy_per_epoch_%d.pkl" % model_no
+    f1_path = "./data/task_test_f1_per_epoch_%d.pkl" % model_no
+    if os.path.isfile(losses_path) and os.path.isfile(accuracy_path) and os.path.isfile(f1_path):
+        losses_per_epoch = load_pickle("task_test_losses_per_epoch_%d.pkl" % model_no)
+        accuracy_per_epoch = load_pickle("task_train_accuracy_per_epoch_%d.pkl" % model_no)
+        f1_per_epoch = load_pickle("task_test_f1_per_epoch_%d.pkl" % model_no)
         logger.info("Loaded results buffer")
     else:
-        losses_per_epoch, accuracy_per_epoch = [], []
-    return losses_per_epoch, accuracy_per_epoch
+        losses_per_epoch, accuracy_per_epoch, f1_per_epoch = [], [], []
+    return losses_per_epoch, accuracy_per_epoch, f1_per_epoch
 
-def evaluate_(lm_logits, blanks_logits, masked_for_pred, blank_labels, tokenizer, print_=True):
-    '''
-    evaluate must be called after loss.backward()
-    '''
-    # lm_logits
-    lm_logits_pred_ids = torch.softmax(lm_logits, dim=-1).max(1)[1]
-    lm_accuracy = ((lm_logits_pred_ids == masked_for_pred).sum().float()/len(masked_for_pred)).item()
+
+def evaluate_(output, labels, ignore_idx):
+    ### ignore index 0 (padding) when calculating accuracy
+    idxs = (labels != ignore_idx).nonzero().squeeze()
+    o_labels = torch.softmax(output, dim=1).max(1)[1]; #print(output.shape, o_labels.shape)
+    l = labels[idxs]; o = o_labels[idxs]
     
-    if print_:
-        print("Predicted masked tokens: \n")
-        print(tokenizer.decode(lm_logits_pred_ids.cpu().numpy() if lm_logits_pred_ids.is_cuda else \
-                               lm_logits_pred_ids.numpy()))
-        print("\nMasked labels tokens: \n")
-        print(tokenizer.decode(masked_for_pred.cpu().numpy() if masked_for_pred.is_cuda else \
-                               masked_for_pred.numpy()))
-        
-    # blanks
-    blanks_diff = ((blanks_logits - blank_labels)**2).detach().cpu().numpy().sum() if blank_labels.is_cuda else\
-                    ((blanks_logits - blank_labels)**2).detach().numpy().sum()
-    blanks_mse = blanks_diff/len(blank_labels)
+    if len(idxs) > 1:
+        acc = (l == o).sum().item()/len(idxs)
+    else:
+        acc = (l == o).sum().item()
+    l = l.cpu().numpy().tolist() if l.is_cuda else l.numpy().tolist()
+    o = o.cpu().numpy().tolist() if o.is_cuda else o.numpy().tolist()
+    return acc, (o, l)
+
+def evaluate_results(net, test_loader, pad_id, cuda):
+    logger.info("Evaluating test samples...")
+    acc = 0; out_labels = []; true_labels = []
+    net.eval()
+    with torch.no_grad():
+        for i, data in tqdm(enumerate(test_loader), total=len(test_loader)):
+            x, e1_e2_start, labels, _,_,_ = data
+            attention_mask = (x != pad_id).float()
+            token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
+
+            if cuda:
+                x = x.cuda()
+                labels = labels.cuda()
+                attention_mask = attention_mask.cuda()
+                token_type_ids = token_type_ids.cuda()
+                
+            classification_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
+                          e1_e2_start=e1_e2_start)
+            
+            accuracy, (o, l) = evaluate_(classification_logits, labels, ignore_idx=-1)
+            out_labels.append([str(i) for i in o]); true_labels.append([str(i) for i in l])
+            acc += accuracy
     
-    if print_:
-        print("Blanks MSE: ", blanks_mse)
-    return lm_accuracy, blanks_mse
+    accuracy = acc/(i + 1)
+    results = {
+        "accuracy": accuracy,
+        "precision": precision_score(true_labels, out_labels),
+        "recall": recall_score(true_labels, out_labels),
+        "f1": f1_score(true_labels, out_labels)
+    }
+    logger.info("***** Eval results *****")
+    for key in sorted(results.keys()):
+        logger.info("  %s = %s", key, str(results[key]))
+    
+    return results
     
