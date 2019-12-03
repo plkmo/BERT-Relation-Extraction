@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 from ..model.modeling_bert import BertModel
 from .preprocessing_funcs import load_dataloaders
-from .train_funcs import Two_Headed_Loss, load_state, load_results, evaluate_, evaluate_results
+from .train_funcs import load_state, load_results, evaluate_, evaluate_results
 from ..misc import save_as_pickle, load_pickle
 import matplotlib.pyplot as plt
 import time
@@ -36,13 +36,14 @@ def train_and_fit(args):
     
     net = BertModel.from_pretrained('bert-base-uncased', force_download=False, \
                                     task='classification', n_classes_=args.num_classes)
+    
     tokenizer = load_pickle("BERT_tokenizer.pkl")
     net.resize_token_embeddings(len(tokenizer)) 
     if cuda:
         net.cuda()
         
     logger.info("FREEZING MOST HIDDEN LAYERS...")
-    unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
+    unfrozen_layers = ["classification_layer", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
     for name, param in net.named_parameters():
         if not any([layer in name for layer in unfrozen_layers]):
             print("[FROZE]: %s" % name)
@@ -50,7 +51,17 @@ def train_and_fit(args):
         else:
             print("[FREE]: %s" % name)
             param.requires_grad = True
-       
+    
+    if args.use_pretrained_blanks == 1:
+        logger.info("Loading model pre-trained on blanks...")
+        checkpoint_path = "./data/test_checkpoint_%d.pth.tar" % args.model_no
+        checkpoint = torch.load(checkpoint_path)
+        model_dict = net.state_dict()
+        pretrained_dict = {k: v for k, v in checkpoint['state_dict'].items() if k in model_dict.keys()}
+        model_dict.update(pretrained_dict)
+        net.load_state_dict(pretrained_dict, strict=False)
+        del checkpoint, pretrained_dict, model_dict
+    
     criterion = nn.CrossEntropyLoss(ignore_index=-1)
     optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
     
@@ -90,9 +101,9 @@ def train_and_fit(args):
             classification_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
                           e1_e2_start=e1_e2_start)
             
-            #return classification_logits, net, tokenizer # for debugging now
+            #return classification_logits, labels, net, tokenizer # for debugging now
             
-            loss = criterion(classification_logits, labels)
+            loss = criterion(classification_logits, labels.squeeze(1))
             loss = loss/args.gradient_acc_steps
             
             if args.fp16:
@@ -117,7 +128,7 @@ def train_and_fit(args):
             if (i % update_size) == (update_size - 1):
                 losses_per_batch.append(args.gradient_acc_steps*total_loss/update_size)
                 accuracy_per_batch.append(total_acc/update_size)
-                print('[Epoch: %d, %5d/ %d points] total loss, lm accuracy per batch: %.3f, %.3f' %
+                print('[Epoch: %d, %5d/ %d points] total loss, accuracy per batch: %.3f, %.3f' %
                       (epoch + 1, (i + 1)*args.batch_size, train_len, losses_per_batch[-1], accuracy_per_batch[-1]))
                 total_loss = 0.0; total_acc = 0.0
         

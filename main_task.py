@@ -25,20 +25,16 @@ if __name__ == "__main__":
                         help="training data .txt file path")
     parser.add_argument("--test_data", type=str, default='./data/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT', \
                         help="test data .txt file path")
+    parser.add_argument("--use_pretrained_blanks", type=int, default=1, help="0: Don't use pre-trained blanks model, 1: use pre-trained blanks model")
     parser.add_argument("--num_classes", type=int, default=19, help='number of relation classes')
     parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
     parser.add_argument("--gradient_acc_steps", type=int, default=1, help="No. of steps of gradient accumulation")
     parser.add_argument("--max_norm", type=float, default=1.0, help="Clipped gradient norm")
     parser.add_argument("--fp16", type=int, default=0, help="1: use mixed precision ; 0: use floating point 32") # mixed precision doesn't seem to train well
-    parser.add_argument("--num_epochs", type=int, default=40, help="No of epochs")
+    parser.add_argument("--num_epochs", type=int, default=20, help="No of epochs")
     parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
     parser.add_argument("--model_no", type=int, default=0, help="Model ID")
     
     args = parser.parse_args()
     
-    train_loader, test_loader, train_length, test_length = load_dataloaders(args)
-    for train in train_loader:
-        break
-    for test in test_loader:
-        break
-    classification_logits, net, tokenizer = train_and_fit(args)
+    net = train_and_fit(args)

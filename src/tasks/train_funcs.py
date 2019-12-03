@@ -9,7 +9,7 @@ import os
 import math
 import torch
 import torch.nn as nn
-from .misc import save_as_pickle, load_pickle
+from ..misc import save_as_pickle, load_pickle
 from seqeval.metrics import precision_score, recall_score, f1_score
 import logging
 from tqdm import tqdm
@@ -60,16 +60,17 @@ def load_results(model_no=0):
 
 def evaluate_(output, labels, ignore_idx):
     ### ignore index 0 (padding) when calculating accuracy
-    idxs = (labels != ignore_idx).nonzero().squeeze()
-    o_labels = torch.softmax(output, dim=1).max(1)[1]; #print(output.shape, o_labels.shape)
-    l = labels[idxs]; o = o_labels[idxs]
-    
+    idxs = (labels != ignore_idx).squeeze()
+    o_labels = torch.softmax(output, dim=1).max(1)[1]
+    l = labels.squeeze()[idxs]; o = o_labels[idxs]
+
     if len(idxs) > 1:
         acc = (l == o).sum().item()/len(idxs)
     else:
         acc = (l == o).sum().item()
     l = l.cpu().numpy().tolist() if l.is_cuda else l.numpy().tolist()
     o = o.cpu().numpy().tolist() if o.is_cuda else o.numpy().tolist()
+
     return acc, (o, l)
 
 def evaluate_results(net, test_loader, pad_id, cuda):

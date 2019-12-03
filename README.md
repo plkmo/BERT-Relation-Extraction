@@ -28,6 +28,7 @@ Run main_task.py with arguments below. Requires SemEval2010 Task 8 dataset, avai
 main_task.py [-h] 
 	[--train_data TRAIN_DATA]
 	[--test_data TEST_DATA]
+	[--use_pretrained_blanks USE_PRETRAINED_BLANKS]
 	[--num_classes NUM_CLASSES] 
 	[--batch_size BATCH_SIZE]
 	[--gradient_acc_steps GRADIENT_ACC_STEPS]
@@ -39,6 +40,6 @@ main_task.py [-h]
 ```
 
 ## To add
-- inference on benchmarks with & without MTB pre-training 
-- fine-tuning MTB on supervised relation extraction tasks
+- inference & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
+- ~~fine-tuning MTB on supervised relation extraction tasks~~
 
