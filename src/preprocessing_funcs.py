@@ -66,7 +66,7 @@ def create_pretraining_corpus(raw_text, window_size=40):
         e1start = e1.start; e1end = e1.end
         if e1.label_ not in entities_of_interest:
             continue
-        if re.search("[\d+]", e1.text):
+        if re.search("[\d+]", e1.text): # entities should not contain numbers
             continue
         
         for j in range(1, len(ents) - i):
@@ -74,7 +74,9 @@ def create_pretraining_corpus(raw_text, window_size=40):
             e2start = e2.start; e2end = e2.end
             if e2.label_ not in entities_of_interest:
                 continue
-            if re.search("[\d+]", e2.text):
+            if re.search("[\d+]", e2.text): # entities should not contain numbers
+                continue
+            if e1.text.lower() == e2.text.lower(): # make sure e1 != e2
                 continue
             
             if (1 <= (e2start - e1end) <= window_size): # check if next nearest entity within window_size
