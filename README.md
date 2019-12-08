@@ -4,7 +4,7 @@
 A PyTorch implementation of the models for the paper ["Matching the Blanks: Distributional Similarity for Relation Learning"](https://arxiv.org/pdf/1906.03158.pdf) published in ACL 2019.
 
 ## Requirements
-Requirements: Python (3.6+), PyTorch (1.2.0), Spacy (2.1.8)
+Requirements: Python (3.6+), PyTorch (1.2.0), Spacy (2.1.8)  
 Pre-trained BERT model courtesy of HuggingFace.co (https://huggingface.co)
 
 ## Training by matching the blanks (MTB)
@@ -38,6 +38,17 @@ main_task.py [-h]
 	[--lr LR]
 	[--model_no MODEL_NO]
 ```
+
+## Benchmark Results
+### SemEval2010 Task 8
+Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
+With MTB pre-training: F1 results when trained on 100 % training data:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/cnn/blanks_task_test_f1_vs_epoch_0.png) 
+
+Without MTB pre-training: F1 results when trained on 100 % training data:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/cnn/task_test_f1_vs_epoch_0.png) 
+
+With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
 ## To add
 - inference & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 

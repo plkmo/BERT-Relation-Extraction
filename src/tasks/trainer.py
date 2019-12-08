@@ -53,7 +53,7 @@ def train_and_fit(args):
             param.requires_grad = True
     
     if args.use_pretrained_blanks == 1:
-        logger.info("Loading model pre-trained on blanks...")
+        logger.info("Loading model pre-trained on blanks at ./data/test_checkpoint_%d.pth.tar..." % args.model_no)
         checkpoint_path = "./data/test_checkpoint_%d.pth.tar" % args.model_no
         checkpoint = torch.load(checkpoint_path)
         model_dict = net.state_dict()
