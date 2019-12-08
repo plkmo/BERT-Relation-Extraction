@@ -43,10 +43,10 @@ main_task.py [-h]
 ### SemEval2010 Task 8
 Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
 With MTB pre-training: F1 results when trained on 100 % training data:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/cnn/blanks_task_test_f1_vs_epoch_0.png) 
+![](https://github.com/plkmo/BERT-Relation-Extraction/tree/master/results/CNN/blanks_task_test_f1_vs_epoch_0.png) 
 
 Without MTB pre-training: F1 results when trained on 100 % training data:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/cnn/task_test_f1_vs_epoch_0.png) 
+![](https://github.com/plkmo/BERT-Relation-Extraction/tree/master/results/CNN/task_test_f1_vs_epoch_0.png) 
 
 With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
