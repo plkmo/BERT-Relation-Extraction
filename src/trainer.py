@@ -57,7 +57,7 @@ def train_and_fit(args):
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2,4,6,8,12,15,18,20,22,\
                                                                       24,26,30], gamma=0.8)
     
-    start_epoch, best_pred, amp_checkpoint = load_state(net, optimizer, scheduler, args, load_best=False)  
+    start_epoch, best_pred, amp_checkpoint = load_state(net, optimizer, scheduler, args, load_best=False)
     
     if (args.fp16) and (amp is not None):
         logger.info("Using fp16...")
