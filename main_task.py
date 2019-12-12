@@ -8,6 +8,7 @@ Created on Mon Dec  2 17:40:16 2019
 
 from src.tasks.preprocessing_funcs import load_dataloaders
 from src.tasks.trainer import train_and_fit
+from src.tasks.infer import infer_from_trained
 import logging
 from argparse import ArgumentParser
 
@@ -35,6 +36,19 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
     parser.add_argument("--model_no", type=int, default=0, help="Model ID")
     
+    parser.add_argument("--train", type=int, default=1, help="0: Don't train, 1: train")
+    parser.add_argument("--infer", type=int, default=1, help="0: Don't infer, 1: Infer")
+    
     args = parser.parse_args()
     
-    net = train_and_fit(args)
+    if args.train == 1:
+        net = train_and_fit(args)
+        
+    if args.infer == 1:
+        inferer = infer_from_trained(args)
+        
+        while True:
+            sent = input("Type input sentence ('quit' or 'exit' to terminate:\n")
+            if sent.lower() in ['quit', 'exit']:
+                break
+            inferer.infer_sentence(sent)

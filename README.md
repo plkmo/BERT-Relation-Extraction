@@ -37,6 +37,8 @@ main_task.py [-h]
 	[--num_epochs NUM_EPOCHS]
 	[--lr LR]
 	[--model_no MODEL_NO]
+	[--train TRAIN]
+	[--infer INFER]
 ```
 
 ## Benchmark Results
