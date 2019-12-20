@@ -41,6 +41,16 @@ main_task.py [-h]
 	[--infer INFER]
 ```
 
+### Inference (infer=1)
+To infer a sentence, annotate entity1 & entity2 of interest within the sentence with their respective entities tags [E1], [E2]. 
+Example:
+```bash
+Type input sentence ('quit' or 'exit' to terminate):
+The surprise [E1]visit[/E1] caused a [E2]frenzy[/E2] on the already chaotic trading floor.
+
+Predicted:  Cause-Effect(e1,e2)
+```
+
 ## Benchmark Results
 ### SemEval2010 Task 8
 Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
@@ -53,6 +63,6 @@ Without MTB pre-training: F1 results when trained on 100 % training data:
 With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
 ## To add
-- inference & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
+- ~~inference~~ & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
 - ~~fine-tuning MTB on supervised relation extraction tasks~~
 
