@@ -8,7 +8,8 @@ Requirements: Python (3.6+), PyTorch (1.2.0), Spacy (2.1.8)
 Pre-trained BERT model courtesy of HuggingFace.co (https://huggingface.co)
 
 ## Training by matching the blanks (MTB)
-Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.
+Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.  
+The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
 ```bash
 main_pretraining.py [-h] 
 	[--pretrain_data TRAIN_PATH] 
