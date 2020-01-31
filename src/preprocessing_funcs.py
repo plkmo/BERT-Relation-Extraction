@@ -237,14 +237,20 @@ class pretrain_dataset(Dataset):
             else:
                 if np.random.uniform() > 0.5: # share e1 but not e2
                     pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] != e2))].index
-                    neg_idxs = np.random.choice(pool, \
-                                                size=min((self.batch_size - 1), len(pool)), replace=False)
+                    if len(pool) > 0:
+                        neg_idxs = np.random.choice(pool, \
+                                                    size=min((self.batch_size - 1), len(pool)), replace=False)
+                    else:
+                        neg_idxs = []
 
                 else: # share e2 but not e1
                     pool = self.df[((self.df['e1'] != e1) & (self.df['e2'] == e2))].index
-                    neg_idxs = np.random.choice(pool, \
-                                                size=min((self.batch_size - 1), len(pool)), replace=False)
-                    
+                    if len(pool) > 0:
+                        neg_idxs = np.random.choice(pool, \
+                                                    size=min((self.batch_size - 1), len(pool)), replace=False)
+                    else:
+                        neg_idxs = []
+                        
                 if len(neg_idxs) == 0: # if empty, sample from all negatives
                     pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
                     neg_idxs = np.random.choice(pool, \
