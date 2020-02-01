@@ -9,6 +9,7 @@ Pre-trained BERT model courtesy of HuggingFace.co (https://huggingface.co)
 
 ## Training by matching the blanks (MTB)
 Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.  
+We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens length) from the text to form relation statements for pre-training. Entities recognition are based on NER and dependency tree parsing of objects/subjects.  
 The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
 ```bash
 main_pretraining.py [-h] 
@@ -42,14 +43,53 @@ main_task.py [-h]
 	[--infer INFER]
 ```
 
-### Inference (infer=1)
-To infer a sentence, annotate entity1 & entity2 of interest within the sentence with their respective entities tags [E1], [E2]. 
+### Inference (--infer=1)
+To infer a sentence, you can annotate entity1 & entity2 of interest within the sentence with their respective entities tags [E1], [E2]. 
 Example:
 ```bash
 Type input sentence ('quit' or 'exit' to terminate):
 The surprise [E1]visit[/E1] caused a [E2]frenzy[/E2] on the already chaotic trading floor.
 
-Predicted:  Cause-Effect(e1,e2)
+Sentence:  The surprise [E1]visit[/E1] caused a [E2]frenzy[/E2] on the already chaotic trading floor.
+Predicted:  Cause-Effect(e1,e2) 
+```
+
+```python
+from src.tasks.infer import infer_from_trained
+
+inferer = infer_from_trained(args, detect_entities=False)
+test = "The surprise [E1]visit[/E1] caused a [E2]frenzy[/E2] on the already chaotic trading floor."
+inferer.infer_sentence(test, detect_entities=False)
+```
+```bash
+Sentence:  The surprise [E1]visit[/E1] caused a [E2]frenzy[/E2] on the already chaotic trading floor.
+Predicted:  Cause-Effect(e1,e2) 
+```
+
+The script can also automatically detect potential entities in an input sentence, in which case all possible relation combinations are inferred:
+```python
+inferer = infer_from_trained(args, detect_entities=True)
+test2 = "After eating the chicken, he developed a sore throat the next morning."
+inferer.infer_sentence(test2, detect_entities=True)
+```
+```bash
+Sentence:  [E2]After eating the chicken[/E2] , [E1]he[/E1] developed a sore throat the next morning .
+Predicted:  Other 
+
+Sentence:  After eating the chicken , [E1]he[/E1] developed [E2]a sore throat[/E2] the next morning .
+Predicted:  Other 
+
+Sentence:  [E1]After eating the chicken[/E1] , [E2]he[/E2] developed a sore throat the next morning .
+Predicted:  Other 
+
+Sentence:  [E1]After eating the chicken[/E1] , he developed [E2]a sore throat[/E2] the next morning .
+Predicted:  Other 
+
+Sentence:  After eating the chicken , [E2]he[/E2] developed [E1]a sore throat[/E1] the next morning .
+Predicted:  Other 
+
+Sentence:  [E2]After eating the chicken[/E2] , he developed [E1]a sore throat[/E1] the next morning .
+Predicted:  Cause-Effect(e2,e1) 
 ```
 
 ## Benchmark Results

@@ -79,14 +79,20 @@ def train_and_fit(args):
         for i, data in enumerate(train_loader, 0):
             x, masked_for_pred, e1_e2_start, Q, blank_labels, _,_,_,_,_ = data
             masked_for_pred = masked_for_pred[(masked_for_pred != pad_id)]
+            if masked_for_pred.shape[0] == 0:
+                print('Empty dataset, skipping...')
+                continue
             attention_mask = (x != pad_id).float()
             token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
 
             if cuda:
-                x = x.cuda(); masked_for_pred = masked_for_pred.cuda(); Q = Q.cuda().float()
+                x = x.cuda(); masked_for_pred = masked_for_pred.cuda().long(); Q = Q.cuda().float()
                 blank_labels = blank_labels.cuda().float()
                 attention_mask = attention_mask.cuda()
                 token_type_ids = token_type_ids.cuda()
+            else:
+                masked_for_pred = masked_for_pred.long(); Q = Q.float()
+                blank_labels = blank_labels.float()
                 
             x = x.long()
             blanks_logits, lm_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=Q,\

@@ -15,7 +15,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from .model.tokenization_bert import BertTokenizer
-from .misc import save_as_pickle, load_pickle
+from .misc import save_as_pickle, load_pickle, get_subject_objects
 from tqdm import tqdm
 import logging
 
@@ -44,23 +44,20 @@ def process_textlines(text):
     text = re.sub(' {2,}', ' ', text) # remove extra spaces > 1
     return text    
 
-def create_pretraining_corpus(raw_text, window_size=40):
+def create_pretraining_corpus(raw_text, nlp, window_size=40):
     '''
     Input: Chunk of raw text
     Output: modified corpus of triplets (relation statement, entity1, entity2)
     '''
-    logger.info("Loading Spacy NLP...")
-    nlp = spacy.load("en_core_web_lg")
-    
     logger.info("Processing sentences...")
     sents_doc = nlp(raw_text)
-    ents = sents_doc.ents
+    ents = sents_doc.ents # get entities
     
-    logger.info("Processing relation statements...")
+    logger.info("Processing relation statements by entities...")
     entities_of_interest = ["PERSON", "NORP", "FAC", "ORG", "GPE", "LOC", "PRODUCT", "EVENT", \
                             "WORK_OF_ART", "LAW", "LANGUAGE"]
     length_doc = len(sents_doc)
-    D = []
+    D = []; ents_list = []
     for i in tqdm(range(len(ents))):
         e1 = ents[i]
         e1start = e1.start; e1end = e1.end
@@ -105,6 +102,10 @@ def create_pretraining_corpus(raw_text, window_size=40):
                     right_r = start if start < length_doc else length_doc
                 else:
                     right_r = length_doc
+                
+                if (right_r - left_r) > window_size: # sentence should not be longer than window_size
+                    continue
+                
                 x = [token.text for token in sents_doc[left_r:right_r]]
                 
                 ### empty strings check ###
@@ -118,7 +119,51 @@ def create_pretraining_corpus(raw_text, window_size=40):
                 
                 r = (x, (e1start - left_r, e1end - left_r), (e2start - left_r, e2end - left_r))
                 D.append((r, e1.text, e2.text))
+                ents_list.append((e1.text, e2.text))
                 #print(e1.text,",", e2.text)
+    print("Processed dataset samples from named entity extraction:")
+    samples_D_idx = np.random.choice([idx for idx in range(len(D))],\
+                                      size=min(3, len(D)),\
+                                      replace=False)
+    for idx in samples_D_idx:
+        print(D[idx], '\n')
+    ref_D = len(D)
+    
+    logger.info("Processing relation statements by dependency tree parsing...")
+    doc_sents = [s for s in sents_doc.sents]
+    for sent_ in tqdm(doc_sents, total=len(doc_sents)):
+        if len(sent_) > (window_size + 1):
+            continue
+        
+        left_r = sent_[0].i
+        pairs = get_subject_objects(sent_)
+        
+        if len(pairs) > 0:
+            for pair in pairs:
+                e1, e2 = pair[0], pair[1]
+                
+                if (len(e1) > 3) or (len(e2) > 3): # don't want entities that are too long
+                    continue
+                
+                e1text, e2text = " ".join(w.text for w in e1) if isinstance(e1, list) else e1.text,\
+                                    " ".join(w.text for w in e2) if isinstance(e2, list) else e2.text
+                e1start, e1end = e1[0].i if isinstance(e1, list) else e1.i, e1[-1].i + 1 if isinstance(e1, list) else e1.i + 1
+                e2start, e2end = e2[0].i if isinstance(e2, list) else e2.i, e2[-1].i + 1 if isinstance(e2, list) else e2.i + 1
+                if (e1end < e2start) and ((e1text, e2text) not in ents_list):
+                    assert e1start != e1end
+                    assert e2start != e2end
+                    assert (e2start - e1end) > 0
+                    r = ([w.text for w in sent_], (e1start - left_r, e1end - left_r), (e2start - left_r, e2end - left_r))
+                    D.append((r, e1text, e2text))
+                    ents_list.append((e1text, e2text))
+    
+    print("Processed dataset samples from dependency tree parsing:")
+    if (len(D) - ref_D) > 0:
+        samples_D_idx = np.random.choice([idx for idx in range(ref_D, len(D))],\
+                                          size=min(3,(len(D) - ref_D)),\
+                                          replace=False)
+        for idx in samples_D_idx:
+            print(D[idx], '\n')
     return D
 
 class pretrain_dataset(Dataset):
@@ -329,9 +374,15 @@ def load_dataloaders(args, max_length=50000):
         num_chunks = math.ceil(len(text)/max_length)
         logger.info("Splitting into %d max length chunks of size %d" % (num_chunks, max_length))
         text_chunks = (text[i*max_length:(i*max_length + max_length)] for i in range(num_chunks))
+        
         D = []
+        logger.info("Loading Spacy NLP...")
+        nlp = spacy.load("en_core_web_lg")
+        
         for text_chunk in tqdm(text_chunks, total=num_chunks):
-            D.extend(create_pretraining_corpus(text_chunk, window_size=40))
+            D.extend(create_pretraining_corpus(text_chunk, nlp, window_size=40))
+            
+        logger.info("Total number of relation statements in pre-training corpus: %d" % len(D))
         save_as_pickle("D.pkl", D)
         logger.info("Saved pre-training corpus to %s" % "./data/D.pkl")
     else:
