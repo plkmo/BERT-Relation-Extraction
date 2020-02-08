@@ -1,26 +1,31 @@
-# BERT for Relation Extraction
+# BERT(S) for Relation Extraction
 
 ## Overview
 A PyTorch implementation of the models for the paper ["Matching the Blanks: Distributional Similarity for Relation Learning"](https://arxiv.org/pdf/1906.03158.pdf) published in ACL 2019.
+Additional models for relation extraction, implemented here based on the paper's methodology:
+- ALBERT (https://arxiv.org/abs/1909.11942)
 
 ## Requirements
 Requirements: Python (3.6+), PyTorch (1.2.0), Spacy (2.1.8)  
-Pre-trained BERT model courtesy of HuggingFace.co (https://huggingface.co)
+Pre-trained BERT(S) model courtesy of HuggingFace.co (https://huggingface.co)
 
 ## Training by matching the blanks (MTB)
 Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.  
 We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens length) from the text to form relation statements for pre-training. Entities recognition are based on NER and dependency tree parsing of objects/subjects.  
 The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
+
+Note: Pre-training can take a long time, depending on available GPU. It is possible to directly fine-tune on the relation-extraction task and still get reasonable results, following the section below.
 ```bash
 main_pretraining.py [-h] 
 	[--pretrain_data TRAIN_PATH] 
 	[--batch_size BATCH_SIZE]
+	[--freeze FREEZE]  
 	[--gradient_acc_steps GRADIENT_ACC_STEPS]
 	[--max_norm MAX_NORM]
 	[--fp16 FP_16]  
 	[--num_epochs NUM_EPOCHS]
 	[--lr LR]
-	[--model_no MODEL_NO]
+	[--model_no MODEL_NO (0: BERT ; 1: ALBERT)]
 ```
 
 ## Fine-tuning on SemEval2010 Task 8
@@ -38,7 +43,7 @@ main_task.py [-h]
 	[--fp16 FP_16]  
 	[--num_epochs NUM_EPOCHS]
 	[--lr LR]
-	[--model_no MODEL_NO]
+	[--model_no MODEL_NO (0: BERT ; 1: ALBERT)]
 	[--train TRAIN]
 	[--infer INFER]
 ```

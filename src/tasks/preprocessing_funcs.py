@@ -11,7 +11,6 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from ..model.tokenization_bert import BertTokenizer
 from ..misc import save_as_pickle, load_pickle
 from tqdm import tqdm
 import logging
@@ -143,16 +142,27 @@ class semeval_dataset(Dataset):
                 torch.LongTensor([self.df.iloc[idx]['relations_id']])
     
 def load_dataloaders(args):
-    if os.path.isfile("./data/BERT_tokenizer.pkl"):
-        tokenizer = load_pickle("BERT_tokenizer.pkl")
+    if args.model_no == 0:
+        from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+        model = 'bert-base-uncased'
+        lower_case = True
+        model_name = 'BERT'
+    elif args.model_no == 1:
+        from ..model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
+        model = 'albert-base-v2'
+        lower_case = False
+        model_name = 'ALBERT'
+        
+    if os.path.isfile("./data/%s_tokenizer.pkl" % model_name):
+        tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         logger.info("Loaded tokenizer from pre-trained blanks model")
     else:
         logger.info("Pre-trained blanks tokenizer not found, initializing new tokenizer...")
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
         tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
 
-        save_as_pickle("BERT_tokenizer.pkl", tokenizer)
-        logger.info("Saved BERT tokenizer at ./data/BERT_tokenizer.pkl")\
+        save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer)
+        logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" %(model_name, model_name))
     
     relations_path = './data/relations.pkl'
     train_path = './data/df_train.pkl'

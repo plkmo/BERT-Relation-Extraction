@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
-from ..model.modeling_bert import BertModel
 from .preprocessing_funcs import load_dataloaders
 from .train_funcs import load_state, load_results, evaluate_, evaluate_results
 from ..misc import save_as_pickle, load_pickle
@@ -34,16 +33,34 @@ def train_and_fit(args):
     train_loader, test_loader, train_len, test_len = load_dataloaders(args)
     logger.info("Loaded %d Training samples." % train_len)
     
-    net = BertModel.from_pretrained('bert-base-uncased', force_download=False, \
-                                    task='classification', n_classes_=args.num_classes)
+    if args.model_no == 0:
+        from ..model.BERT.modeling_bert import BertModel as Model
+        model = 'bert-base-uncased'
+        lower_case = True
+        model_name = 'BERT'
+    elif args.model_no == 1:
+        from ..model.ALBERT.modeling_albert import AlbertModel as Model
+        model = 'albert-base-v2'
+        lower_case = False
+        model_name = 'ALBERT'
     
-    tokenizer = load_pickle("BERT_tokenizer.pkl")
+    net = Model.from_pretrained(model, force_download=False, \
+                                task='classification', n_classes_=args.num_classes)
+    
+    tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer)) 
     if cuda:
         net.cuda()
         
     logger.info("FREEZING MOST HIDDEN LAYERS...")
-    unfrozen_layers = ["classification_layer", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
+    if args.model_no == 0:
+        unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", \
+                           "classification_layer", "blanks_linear", "lm_linear", "cls"]
+    elif args.model_no == 1:
+        unfrozen_layers = ["classifier", "pooler", "classification_layer",\
+                           "blanks_linear", "lm_linear", "cls",\
+                           "albert_layer_groups.0.albert_layers.0.ffn"]
+        
     for name, param in net.named_parameters():
         if not any([layer in name for layer in unfrozen_layers]):
             print("[FROZE]: %s" % name)

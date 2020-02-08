@@ -23,12 +23,16 @@ if __name__ == "__main__":
     parser.add_argument("--pretrain_data", type=str, default="./data/cnn.txt", \
                         help="pre-training data .txt file path")
     parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
+    parser.add_argument("--freeze", type=int, default=0, help='''1: Freeze most layers until classifier layers\
+                                                                \n0: Don\'t freeze \
+                                                                (Probably best not to freeze if GPU memory is sufficient)''')
     parser.add_argument("--gradient_acc_steps", type=int, default=2, help="No. of steps of gradient accumulation")
     parser.add_argument("--max_norm", type=float, default=1.0, help="Clipped gradient norm")
     parser.add_argument("--fp16", type=int, default=0, help="1: use mixed precision ; 0: use floating point 32") # mixed precision doesn't seem to train well
     parser.add_argument("--num_epochs", type=int, default=50, help="No of epochs")
     parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
-    parser.add_argument("--model_no", type=int, default=0, help="Model ID")
+    parser.add_argument("--model_no", type=int, default=0, help='''Model ID: 0 - BERT\n
+                                                                            1 - ALBERT''')
     
     args = parser.parse_args()
     

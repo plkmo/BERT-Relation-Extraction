@@ -14,7 +14,6 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from .model.tokenization_bert import BertTokenizer
 from .misc import save_as_pickle, load_pickle, get_subject_objects
 from tqdm import tqdm
 import logging
@@ -167,7 +166,7 @@ def create_pretraining_corpus(raw_text, nlp, window_size=40):
     return D
 
 class pretrain_dataset(Dataset):
-    def __init__(self, D, batch_size=None):
+    def __init__(self, args, D, batch_size=None):
         self.internal_batching = True
         self.batch_size = batch_size # batch_size cannot be None if internal_batching == True
         self.alpha = 0.7
@@ -177,7 +176,18 @@ class pretrain_dataset(Dataset):
         self.e1s = list(self.df['e1'].unique())
         self.e2s = list(self.df['e2'].unique())
         
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        if args.model_no == 0:
+            from .model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+            model = 'bert-base-uncased'
+            lower_case = True
+            model_name = 'BERT'
+        elif args.model_no == 1:
+            from .model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
+            model = 'albert-base-v2'
+            lower_case = False
+            model_name = 'ALBERT'
+        
+        self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
         self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
         self.cls_token = self.tokenizer.cls_token
         self.sep_token = self.tokenizer.sep_token
@@ -191,8 +201,8 @@ class pretrain_dataset(Dataset):
                                label3_pad_value=-1,\
                                label4_pad_value=-1)
         
-        save_as_pickle("BERT_tokenizer.pkl", self.tokenizer)
-        logger.info("Saved BERT tokenizer at ./data/BERT_tokenizer.pkl")
+        save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
+        logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
         
     def put_blanks(self, D):
         blank_e1 = np.random.uniform()
@@ -389,7 +399,7 @@ def load_dataloaders(args, max_length=50000):
         logger.info("Loaded pre-training data from saved file")
         D = load_pickle("D.pkl")
         
-    train_set = pretrain_dataset(D, batch_size=args.batch_size)
+    train_set = pretrain_dataset(args, D, batch_size=args.batch_size)
     train_length = len(train_set)
     '''
     # if using fixed batching

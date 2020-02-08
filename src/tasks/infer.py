@@ -45,12 +45,22 @@ class infer_from_trained(object):
                                      "WORK_OF_ART", "LAW", "LANGUAGE", 'PER']
         
         logger.info("Loading tokenizer and model...")
-        from ..model.modeling_bert import BertModel
         from .train_funcs import load_state
         
-        self.net = BertModel.from_pretrained('bert-base-uncased', force_download=False, \
-                                    task='classification', n_classes_=args.num_classes)
-        self.tokenizer = load_pickle("BERT_tokenizer.pkl")
+        if args.model_no == 0:
+            from ..model.BERT.modeling_bert import BertModel as Model
+            model = 'bert-base-uncased'
+            lower_case = True
+            model_name = 'BERT'
+        elif args.model_no == 1:
+            from ..model.ALBERT.modeling_albert import AlbertModel as Model
+            model = 'albert-base-v2'
+            lower_case = False
+            model_name = 'ALBERT'
+        
+        self.net = Model.from_pretrained(model, force_download=False, \
+                                         task='classification', n_classes_=args.num_classes)
+        self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
         if self.cuda:
             self.net.cuda()

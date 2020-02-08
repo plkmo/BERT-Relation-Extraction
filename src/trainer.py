@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
-from .model.modeling_bert import BertModel
 from .preprocessing_funcs import load_dataloaders
 from .train_funcs import Two_Headed_Loss, load_state, load_results, evaluate_
 from .misc import save_as_pickle, load_pickle
@@ -35,21 +34,40 @@ def train_and_fit(args):
     train_len = len(train_loader)
     logger.info("Loaded %d pre-training samples." % train_len)
     
-    net = BertModel.from_pretrained('bert-base-uncased', force_download=False)
-    tokenizer = load_pickle("BERT_tokenizer.pkl")
+    if args.model_no == 0:
+        from .model.BERT.modeling_bert import BertModel as Model
+        model = 'bert-base-uncased'
+        lower_case = True
+        model_name = 'BERT'
+    elif args.model_no == 1:
+        from .model.ALBERT.modeling_albert import AlbertModel as Model
+        model = 'albert-base-v2'
+        lower_case = False
+        model_name = 'ALBERT'
+    
+    net = Model.from_pretrained(model, force_download=False)
+    tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer)) 
     if cuda:
         net.cuda()
         
-    logger.info("FREEZING MOST HIDDEN LAYERS...")
-    unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "blanks_linear", "lm_linear", "cls"]
-    for name, param in net.named_parameters():
-        if not any([layer in name for layer in unfrozen_layers]):
-            print("[FROZE]: %s" % name)
-            param.requires_grad = False
-        else:
-            print("[FREE]: %s" % name)
-            param.requires_grad = True
+    if args.freeze == 1:
+        logger.info("FREEZING MOST HIDDEN LAYERS...")
+        if args.model_no == 0:
+            unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "encoder.layer.10",\
+                               "encoder.layer.9", "blanks_linear", "lm_linear", "cls"]
+        elif args.model_no == 1:
+            unfrozen_layers = ["classifier", "pooler", "embeddings", "attention",\
+                               "blanks_linear", "lm_linear", "cls",\
+                               "albert_layer_groups.0.albert_layers.0.ffn"]
+            
+        for name, param in net.named_parameters():
+            if not any([layer in name for layer in unfrozen_layers]):
+                print("[FROZE]: %s" % name)
+                param.requires_grad = False
+            else:
+                print("[FREE]: %s" % name)
+                param.requires_grad = True
        
     criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id)
     optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
@@ -78,6 +96,7 @@ def train_and_fit(args):
         net.train(); total_loss = 0.0; losses_per_batch = []; total_acc = 0.0; lm_accuracy_per_batch = []
         for i, data in enumerate(train_loader, 0):
             x, masked_for_pred, e1_e2_start, Q, blank_labels, _,_,_,_,_ = data
+            masked_for_pred1 =  masked_for_pred
             masked_for_pred = masked_for_pred[(masked_for_pred != pad_id)]
             if masked_for_pred.shape[0] == 0:
                 print('Empty dataset, skipping...')
@@ -99,7 +118,7 @@ def train_and_fit(args):
                           e1_e2_start=e1_e2_start)
             lm_logits = lm_logits[(x == mask_id)]
             
-            #return lm_logits, blanks_logits, masked_for_pred, blank_labels, tokenizer # for debugging now
+            #return lm_logits, blanks_logits, x, e1_e2_start, Q, masked_for_pred1, blank_labels, tokenizer # for debugging now
             
             loss = criterion(lm_logits, blanks_logits, masked_for_pred, blank_labels)
             loss = loss/args.gradient_acc_steps
