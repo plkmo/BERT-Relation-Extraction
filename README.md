@@ -14,7 +14,8 @@ Run main_pretraining.py with arguments below. Pre-training data can be any .txt 
 We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens length) from the text to form relation statements for pre-training. Entities recognition are based on NER and dependency tree parsing of objects/subjects.  
 The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
 
-Note: Pre-training can take a long time, depending on available GPU. It is possible to directly fine-tune on the relation-extraction task and still get reasonable results, following the section below.
+Note: Pre-training can take a long time, depending on available GPU. It is possible to directly fine-tune on the relation-extraction task and still get reasonable results, following the section below.  
+ALBERT model trained on MTB with cnn.txt can be downloaded [here,](https://drive.google.com/drive/folders/1cTBi6gqPTgG1gYXuGH5LtZ3ZhD_Upy4M?usp=sharing) with MTB training results shown below.
 ```bash
 main_pretraining.py [-h] 
 	[--pretrain_data TRAIN_PATH] 
@@ -108,7 +109,13 @@ Without MTB pre-training: F1 results when trained on 100 % training data:
 
 With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
+Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
+MTB training results:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/loss_vs_epoch_1.png) 
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/accuracy_vs_epoch_1.png) 
+
 ## To add
 - ~~inference~~ & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
 - ~~fine-tuning MTB on supervised relation extraction tasks~~
+- felrel task
 
