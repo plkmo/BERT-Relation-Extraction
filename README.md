@@ -1,7 +1,7 @@
 # BERT(S) for Relation Extraction
 
 ## Overview
-A PyTorch implementation of the models for the paper ["Matching the Blanks: Distributional Similarity for Relation Learning"](https://arxiv.org/pdf/1906.03158.pdf) published in ACL 2019.
+A PyTorch implementation of the models for the paper ["Matching the Blanks: Distributional Similarity for Relation Learning"](https://arxiv.org/pdf/1906.03158.pdf) published in ACL 2019. Note: This is not an official repo for the paper.
 Additional models for relation extraction, implemented here based on the paper's methodology:
 - ALBERT (https://arxiv.org/abs/1909.11942)
 
@@ -99,6 +99,12 @@ Predicted:  Cause-Effect(e2,e1)
 ```
 
 ## Benchmark Results
+### MTB pre-training
+Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
+MTB training results:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/loss_vs_epoch_1.png) 
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/accuracy_vs_epoch_1.png) 
+
 ### SemEval2010 Task 8
 Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
 With MTB pre-training: F1 results when trained on 100 % training data:
@@ -108,11 +114,6 @@ Without MTB pre-training: F1 results when trained on 100 % training data:
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/task_test_f1_vs_epoch_0.png) 
 
 With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
-
-Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
-MTB training results:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/loss_vs_epoch_1.png) 
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/accuracy_vs_epoch_1.png) 
 
 ## To add
 - ~~inference~~ & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
