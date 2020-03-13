@@ -100,13 +100,13 @@ Predicted:  Cause-Effect(e2,e1)
 
 ## Benchmark Results
 ### MTB pre-training
-Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
+2) Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
 MTB training results:
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/loss_vs_epoch_1.png) 
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/accuracy_vs_epoch_1.png) 
 
 ### SemEval2010 Task 8
-Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
+1) Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
 With MTB pre-training: F1 results when trained on 100 % training data:
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/blanks_task_test_f1_vs_epoch_0.png) 
 
@@ -115,8 +115,18 @@ Without MTB pre-training: F1 results when trained on 100 % training data:
 
 With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
+2) Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
+With MTB pre-training: F1 results when trained on 100 % training data:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/blanks_task_test_f1_vs_epoch_1.png) 
+
+Without MTB pre-training: F1 results when trained on 100 % training data:
+![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/task_test_f1_vs_epoch_1.png) 
+
+For ALBERT, it looks like pretraining with MTB causes the model to overfit. Using ALBERT directly on the SemEval2010 Task 8 gives much better f1.  
+It seems ALBERT's modifications: parameter-sharing across the layers & factorization of the embedding parametrization is not suitable with MTB pretraining.  
+
 ## To add
-- ~~inference~~ & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training 
+- ~~inference & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training~~
 - ~~fine-tuning MTB on supervised relation extraction tasks~~
 - felrel task
 
