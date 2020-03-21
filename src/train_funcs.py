@@ -68,9 +68,10 @@ class Two_Headed_Loss(nn.Module):
             blank_labels_ = blank_labels_.cuda()
         
         lm_loss = self.LM_criterion(lm_logits, lm_labels)
+
         blank_loss = self.BCE_criterion(torch.cat([pos_logits, neg_logits], dim=0), \
                                         blank_labels_)
-        
+
         if verbose:
             print("LM loss, blank_loss: %.5f, %.5f" % (lm_loss, blank_loss))
             

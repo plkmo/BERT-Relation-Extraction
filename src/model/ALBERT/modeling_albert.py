@@ -594,7 +594,7 @@ class AlbertModel(AlbertPreTrainedModel):
         del buffer
         
         if self.task is None:
-            blanks_logits = v1v2 # self.sigmoid(self.blanks_linear( - torch.log(Q))
+            blanks_logits = self.sigmoid(v1v2) # self.sigmoid(self.blanks_linear( - torch.log(Q))
             lm_logits = self.cls(sequence_output)
             return blanks_logits, lm_logits
         

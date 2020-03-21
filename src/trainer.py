@@ -95,7 +95,7 @@ def train_and_fit(args):
         start_time = time.time()
         net.train(); total_loss = 0.0; losses_per_batch = []; total_acc = 0.0; lm_accuracy_per_batch = []
         for i, data in enumerate(train_loader, 0):
-            x, masked_for_pred, e1_e2_start, Q, blank_labels, _,_,_,_,_ = data
+            x, masked_for_pred, e1_e2_start, _, blank_labels, _,_,_,_,_ = data
             masked_for_pred1 =  masked_for_pred
             masked_for_pred = masked_for_pred[(masked_for_pred != pad_id)]
             if masked_for_pred.shape[0] == 0:
@@ -105,11 +105,11 @@ def train_and_fit(args):
             token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
 
             if cuda:
-                x = x.cuda(); masked_for_pred = masked_for_pred.cuda(); Q = Q.cuda()
+                x = x.cuda(); masked_for_pred = masked_for_pred.cuda()
                 attention_mask = attention_mask.cuda()
                 token_type_ids = token_type_ids.cuda()
             
-            blanks_logits, lm_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=Q,\
+            blanks_logits, lm_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
                           e1_e2_start=e1_e2_start)
             lm_logits = lm_logits[(x == mask_id)]
             
