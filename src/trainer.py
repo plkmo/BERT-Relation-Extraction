@@ -105,22 +105,21 @@ def train_and_fit(args):
             token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
 
             if cuda:
-                x = x.cuda(); masked_for_pred = masked_for_pred.cuda().long(); Q = Q.cuda().float()
-                blank_labels = blank_labels.cuda().float()
+                x = x.cuda(); masked_for_pred = masked_for_pred.cuda(); Q = Q.cuda()
                 attention_mask = attention_mask.cuda()
                 token_type_ids = token_type_ids.cuda()
-            else:
-                masked_for_pred = masked_for_pred.long(); Q = Q.float()
-                blank_labels = blank_labels.float()
-                
-            x = x.long()
+            
             blanks_logits, lm_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=Q,\
                           e1_e2_start=e1_e2_start)
             lm_logits = lm_logits[(x == mask_id)]
             
-            #return lm_logits, blanks_logits, x, e1_e2_start, Q, masked_for_pred1, blank_labels, tokenizer # for debugging now
-            
-            loss = criterion(lm_logits, blanks_logits, masked_for_pred, blank_labels)
+            #return lm_logits, blanks_logits, x, e1_e2_start, Q, masked_for_pred, masked_for_pred1, blank_labels, tokenizer # for debugging now
+            if (i % update_size) == (update_size - 1):
+                verbose = True
+            else:
+                verbose = False
+                
+            loss = criterion(lm_logits, blanks_logits, masked_for_pred, blank_labels, verbose=verbose)
             loss = loss/args.gradient_acc_steps
             
             if args.fp16:
@@ -148,6 +147,8 @@ def train_and_fit(args):
                 print('[Epoch: %d, %5d/ %d points] total loss, lm accuracy per batch: %.3f, %.3f' %
                       (epoch + 1, (i + 1), train_len, losses_per_batch[-1], lm_accuracy_per_batch[-1]))
                 total_loss = 0.0; total_acc = 0.0
+                logger.info("Last batch samples (pos, neg): %d, %d" % ((blank_labels.squeeze() == 1).sum().item(),\
+                                                                    (blank_labels.squeeze() == 0).sum().item()))
         
         scheduler.step()
         losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))

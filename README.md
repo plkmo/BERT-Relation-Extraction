@@ -2,8 +2,8 @@
 
 ## Overview
 A PyTorch implementation of the models for the paper ["Matching the Blanks: Distributional Similarity for Relation Learning"](https://arxiv.org/pdf/1906.03158.pdf) published in ACL 2019.  
-Note: This is not an official repo for the paper.
-Additional models for relation extraction, implemented here based on the paper's methodology:
+Note: This is not an official repo for the paper.  
+Additional models for relation extraction, implemented here based on the paper's methodology:  
 - ALBERT (https://arxiv.org/abs/1909.11942)
 
 ## Requirements
@@ -16,7 +16,7 @@ We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens le
 The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
 
 Note: Pre-training can take a long time, depending on available GPU. It is possible to directly fine-tune on the relation-extraction task and still get reasonable results, following the section below.  
-ALBERT model trained on MTB with cnn.txt can be downloaded [here,](https://drive.google.com/drive/folders/1cTBi6gqPTgG1gYXuGH5LtZ3ZhD_Upy4M?usp=sharing) with MTB training results shown below.
+
 ```bash
 main_pretraining.py [-h] 
 	[--pretrain_data TRAIN_PATH] 
@@ -100,34 +100,20 @@ Predicted:  Cause-Effect(e2,e1)
 ```
 
 ## Benchmark Results
-### MTB pre-training
-2) Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)
-MTB training results:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/loss_vs_epoch_1.png) 
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/accuracy_vs_epoch_1.png) 
 
 ### SemEval2010 Task 8
 1) Base architecture: BERT base uncased (12-layer, 768-hidden, 12-heads, 110M parameters)
-With MTB pre-training: F1 results when trained on 100 % training data:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/blanks_task_test_f1_vs_epoch_0.png) 
 
 Without MTB pre-training: F1 results when trained on 100 % training data:
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/task_test_f1_vs_epoch_0.png) 
 
-With 100 % training data, both models perform similarly, as reproduced in the paper. Yet to test cases where data is limited.
 
 2) Base architecture: ALBERT base uncased (12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters)  
-With MTB pre-training: F1 results when trained on 100 % training data:
-![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/blanks_task_test_f1_vs_epoch_1.png) 
 
 Without MTB pre-training: F1 results when trained on 100 % training data:
 ![](https://github.com/plkmo/BERT-Relation-Extraction/blob/master/results/CNN/task_test_f1_vs_epoch_1.png) 
 
-For ALBERT, it looks like pretraining with MTB causes the model to overfit. Using ALBERT directly on the SemEval2010 Task 8 gives much better f1.  
-It seems ALBERT's modifications: parameter-sharing across the layers & factorization of the embedding parametrization is not suitable with MTB pretraining.  
-
 ## To add
-- ~~inference & results on benchmarks (SemEval2010 Task 8) with & without MTB pre-training~~
-- ~~fine-tuning MTB on supervised relation extraction tasks~~
+- inference & results on benchmarks (SemEval2010 Task 8) with MTB pre-training
 - felrel task
 

@@ -615,8 +615,8 @@ class BertModel(BertPreTrainedModel):
         
         if self.task is None:
             ### blanks head ###
-            self.blanks_linear = nn.Linear(1536, 1)
-            self.sigmoid = nn.Sigmoid()
+            #self.blanks_linear = nn.Linear(1536, 1)
+            #self.sigmoid = nn.Sigmoid()
             
             ### LM head ###
             self.cls = BertOnlyMLMHead(config)
@@ -747,7 +747,7 @@ class BertModel(BertPreTrainedModel):
         del buffer
         
         if self.task is None:
-            blanks_logits = self.sigmoid(self.blanks_linear(v1v2) - torch.log(Q))
+            blanks_logits = v1v2 # self.blanks_linear(- torch.log(Q) # self.sigmoid(
             lm_logits = self.cls(sequence_output)
             return blanks_logits, lm_logits
         

@@ -275,8 +275,11 @@ class pretrain_dataset(Dataset):
         
         ### implements noise contrastive estimation
         else:
+            ### get positive samples
             r, e1, e2 = self.df.iloc[idx] # positive sample
-            
+            pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] == e2))].index
+            pos_idxs = np.random.choice(pool, \
+                                        size=min(int(self.batch_size//2), len(pool)), replace=False)
             ### get negative samples
             '''
             choose from option: 
@@ -286,7 +289,7 @@ class pretrain_dataset(Dataset):
             if np.random.uniform() > 0.5:   
                 pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
                 neg_idxs = np.random.choice(pool, \
-                                            size=min((self.batch_size - 1), len(pool)), replace=False)
+                                            size=min(int(self.batch_size//2), len(pool)), replace=False)
                 Q = 1/len(pool)
             
             else:
@@ -294,7 +297,7 @@ class pretrain_dataset(Dataset):
                     pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] != e2))].index
                     if len(pool) > 0:
                         neg_idxs = np.random.choice(pool, \
-                                                    size=min((self.batch_size - 1), len(pool)), replace=False)
+                                                    size=min(int(self.batch_size//2), len(pool)), replace=False)
                     else:
                         neg_idxs = []
 
@@ -302,34 +305,39 @@ class pretrain_dataset(Dataset):
                     pool = self.df[((self.df['e1'] != e1) & (self.df['e2'] == e2))].index
                     if len(pool) > 0:
                         neg_idxs = np.random.choice(pool, \
-                                                    size=min((self.batch_size - 1), len(pool)), replace=False)
+                                                    size=min(int(self.batch_size//2), len(pool)), replace=False)
                     else:
                         neg_idxs = []
                         
                 if len(neg_idxs) == 0: # if empty, sample from all negatives
                     pool = self.df[((self.df['e1'] != e1) | (self.df['e2'] != e2))].index
                     neg_idxs = np.random.choice(pool, \
-                                            size=min((self.batch_size - 1), len(pool)), replace=False)
+                                            size=min(int(self.batch_size//2), len(pool)), replace=False)
                 Q = 1/len(pool)
             
+            batch = []
             ## process positive sample
-            x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
-            x = torch.tensor(x)
-            masked_for_pred = torch.tensor(masked_for_pred)
-            e1_e2_start = torch.tensor(e1_e2_start)
-            e1, e2 = torch.tensor(e1), torch.tensor(e2)
-            batch = [(x, masked_for_pred, e1_e2_start, torch.tensor([0]).long(), torch.tensor([1]))]
+            pos_df = self.df.loc[pos_idxs]
+            for idx, row in pos_df.iterrows():
+                r, e1, e2 = row[0], row[1], row[2]
+                x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+                x = torch.LongTensor(x)
+                masked_for_pred = torch.LongTensor(masked_for_pred)
+                e1_e2_start = torch.tensor(e1_e2_start)
+                #e1, e2 = torch.tensor(e1), torch.tensor(e2)
+                batch.append((x, masked_for_pred, e1_e2_start, torch.FloatTensor([1.0]),\
+                              torch.LongTensor([1])))
             
             ## process negative samples
             negs_df = self.df.loc[neg_idxs]
             for idx, row in negs_df.iterrows():
                 r, e1, e2 = row[0], row[1], row[2]
                 x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
-                x = torch.tensor(x)
-                masked_for_pred = torch.tensor(masked_for_pred)
+                x = torch.LongTensor(x)
+                masked_for_pred = torch.LongTensor(masked_for_pred)
                 e1_e2_start = torch.tensor(e1_e2_start)
-                e1, e2 = torch.tensor(e1), torch.tensor(e2)
-                batch.append((x, masked_for_pred, e1_e2_start, torch.tensor([Q]), torch.tensor([0])))
+                #e1, e2 = torch.tensor(e1), torch.tensor(e2)
+                batch.append((x, masked_for_pred, e1_e2_start, torch.FloatTensor([Q]), torch.LongTensor([0])))
             batch = self.PS(batch)
             return batch
     
