@@ -69,7 +69,7 @@ def train_and_fit(args):
                 print("[FREE]: %s" % name)
                 param.requires_grad = True
        
-    criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id)
+    criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id, use_logits=True, normalize=True)
     optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
     
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2,4,6,8,12,15,18,20,22,\
@@ -113,7 +113,7 @@ def train_and_fit(args):
                           e1_e2_start=e1_e2_start)
             lm_logits = lm_logits[(x == mask_id)]
             
-            #return lm_logits, blanks_logits, x, e1_e2_start, Q, masked_for_pred, masked_for_pred1, blank_labels, tokenizer # for debugging now
+            #return lm_logits, blanks_logits, x, e1_e2_start, masked_for_pred, masked_for_pred1, blank_labels, tokenizer # for debugging now
             if (i % update_size) == (update_size - 1):
                 verbose = True
             else:
