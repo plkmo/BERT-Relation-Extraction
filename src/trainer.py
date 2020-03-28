@@ -69,7 +69,7 @@ def train_and_fit(args):
                 print("[FREE]: %s" % name)
                 param.requires_grad = True
        
-    criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id, use_logits=True, normalize=True)
+    criterion = Two_Headed_Loss(lm_ignore_idx=tokenizer.pad_token_id, use_logits=True, normalize=False)
     optimizer = optim.Adam([{"params":net.parameters(), "lr": args.lr}])
     
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2,4,6,8,12,15,18,20,22,\

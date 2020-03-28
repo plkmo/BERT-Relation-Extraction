@@ -187,8 +187,16 @@ class pretrain_dataset(Dataset):
             lower_case = False
             model_name = 'ALBERT'
         
-        self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
-        self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
+        tokenizer_path = './data/%s_tokenizer.pkl' % (model_name)
+        if os.path.isfile(tokenizer_path):
+            self.tokenizer = load_pickle('%s_tokenizer.pkl' % (model_name))
+            logger.info("Loaded tokenizer from saved path.")
+        else:
+            self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
+            self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
+            save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
+            logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
+            
         self.cls_token = self.tokenizer.cls_token
         self.sep_token = self.tokenizer.sep_token
         self.E1_token_id = self.tokenizer.encode("[E1]")[1:-1][0]
@@ -200,9 +208,6 @@ class pretrain_dataset(Dataset):
                                label2_pad_value=-1,\
                                label3_pad_value=-1,\
                                label4_pad_value=-1)
-        
-        save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
-        logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
         
     def put_blanks(self, D):
         blank_e1 = np.random.uniform()
@@ -226,8 +231,8 @@ class pretrain_dataset(Dataset):
         masked_idxs = np.random.choice(pool_idxs,\
                                         size=round(self.mask_probability*len(pool_idxs)),\
                                         replace=False)
-        masked_for_pred = [token for idx, token in enumerate(x) if (idx in masked_idxs)]
-        masked_for_pred = [w.lower() for w in masked_for_pred] # we are using uncased model
+        masked_for_pred = [token.lower() for idx, token in enumerate(x) if (idx in masked_idxs)]
+        #masked_for_pred = [w.lower() for w in masked_for_pred] # we are using uncased model
         x = [token if (idx not in masked_idxs) else self.tokenizer.mask_token \
              for idx, token in enumerate(x)]
 
@@ -253,11 +258,13 @@ class pretrain_dataset(Dataset):
         
         x = self.tokenizer.convert_tokens_to_ids(x)
         masked_for_pred = self.tokenizer.convert_tokens_to_ids(masked_for_pred)
+        '''
         e1 = [e for idx, e in enumerate(x) if idx in [i for i in\
               range(x.index(self.E1_token_id) + 1, x.index(self.E1s_token_id))]]
         e2 = [e for idx, e in enumerate(x) if idx in [i for i in\
               range(x.index(self.E2_token_id) + 1, x.index(self.E2s_token_id))]]
-        return x, masked_for_pred, e1_e2_start, e1, e2
+        '''
+        return x, masked_for_pred, e1_e2_start #, e1, e2
     
     def __len__(self):
         return len(self.df)
@@ -266,11 +273,11 @@ class pretrain_dataset(Dataset):
         ### implements standard batching
         if not self.internal_batching:
             r, e1, e2 = self.df.iloc[idx]
-            x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+            x, masked_for_pred, e1_e2_start = self.tokenize(self.put_blanks((r, e1, e2)))
             x = torch.tensor(x)
             masked_for_pred = torch.tensor(masked_for_pred)
             e1_e2_start = torch.tensor(e1_e2_start)
-            e1, e2 = torch.tensor(e1), torch.tensor(e2)
+            #e1, e2 = torch.tensor(e1), torch.tensor(e2)
             return x, masked_for_pred, e1_e2_start, e1, e2
         
         ### implements noise contrastive estimation
@@ -320,7 +327,7 @@ class pretrain_dataset(Dataset):
             pos_df = self.df.loc[pos_idxs]
             for idx, row in pos_df.iterrows():
                 r, e1, e2 = row[0], row[1], row[2]
-                x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+                x, masked_for_pred, e1_e2_start = self.tokenize(self.put_blanks((r, e1, e2)))
                 x = torch.LongTensor(x)
                 masked_for_pred = torch.LongTensor(masked_for_pred)
                 e1_e2_start = torch.tensor(e1_e2_start)
@@ -332,7 +339,7 @@ class pretrain_dataset(Dataset):
             negs_df = self.df.loc[neg_idxs]
             for idx, row in negs_df.iterrows():
                 r, e1, e2 = row[0], row[1], row[2]
-                x, masked_for_pred, e1_e2_start, e1, e2 = self.tokenize(self.put_blanks((r, e1, e2)))
+                x, masked_for_pred, e1_e2_start = self.tokenize(self.put_blanks((r, e1, e2)))
                 x = torch.LongTensor(x)
                 masked_for_pred = torch.LongTensor(masked_for_pred)
                 e1_e2_start = torch.tensor(e1_e2_start)
