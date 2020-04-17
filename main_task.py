@@ -22,6 +22,7 @@ logger = logging.getLogger('__file__')
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument("--task", type=str, default='semeval', help='semeval, fewrel')
     parser.add_argument("--train_data", type=str, default='./data/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT', \
                         help="training data .txt file path")
     parser.add_argument("--test_data", type=str, default='./data/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT', \
@@ -36,7 +37,6 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
     parser.add_argument("--model_no", type=int, default=1, help='''Model ID: 0 - BERT\n
                                                                             1 - ALBERT''')
-    
     parser.add_argument("--train", type=int, default=1, help="0: Don't train, 1: train")
     parser.add_argument("--infer", type=int, default=1, help="0: Don't infer, 1: Infer")
     
