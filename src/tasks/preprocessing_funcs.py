@@ -7,7 +7,9 @@ Created on Tue Nov 26 18:12:22 2019
 """
 import os
 import re
+import random
 import pandas as pd
+import json
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
@@ -125,13 +127,20 @@ class semeval_dataset(Dataset):
         logger.info("Tokenizing data...")
         self.df['input'] = self.df.progress_apply(lambda x: tokenizer.encode(x['sents']),\
                                                              axis=1)
+        
         def get_e1e2_start(x, e1_id, e2_id):
-            e1_e2_start = ([i for i, e in enumerate(x) if e == e1_id][0],\
-                            [i for i, e in enumerate(x) if e == e2_id][0])
+            try:
+                e1_e2_start = ([i for i, e in enumerate(x) if e == e1_id][0],\
+                                [i for i, e in enumerate(x) if e == e2_id][0])
+            except Exception as e:
+                e1_e2_start = None
+                print(e)
             return e1_e2_start
         
         self.df['e1_e2_start'] = self.df.progress_apply(lambda x: get_e1e2_start(x['input'],\
                                                        e1_id=self.e1_id, e2_id=self.e2_id), axis=1)
+        print("\nInvalid rows/total: %d/%d" % (df['e1_e2_start'].isnull().sum(), len(df)))
+        self.df.dropna(axis=0, inplace=True)
     
     def __len__(self,):
         return len(self.df)
@@ -141,8 +150,96 @@ class semeval_dataset(Dataset):
                 torch.LongTensor(self.df.iloc[idx]['e1_e2_start']),\
                 torch.LongTensor([self.df.iloc[idx]['relations_id']])
 
-def preprocess_fewrel():
-    return
+def preprocess_fewrel(args):
+    '''
+    train: train_wiki.json
+    test: val_wiki.json
+    For 5 way 1 shot
+    '''
+    with open('./data/fewrel/train_wiki.json') as f:
+        train_data = json.load(f)
+        
+    with  open('./data/fewrel/val_wiki.json') as f:
+        test_data = json.load(f)
+    
+    sents = []
+    labels = []
+    for relation, dataset in train_data.items():
+        for data in dataset:
+            # first, get & verify the positions of entities
+            h_pos, t_pos = data['h'][-1], data['t'][-1]
+            
+            if not len(h_pos) == len(t_pos) == 1: # remove one-to-many relation mappings
+                continue
+            
+            h_pos, t_pos = h_pos[0], t_pos[0]
+            
+            if len(h_pos) > 1:
+                running_list = [i for i in range(min(h_pos), max(h_pos) + 1)]
+                assert h_pos == running_list
+                h_pos = [h_pos[0], h_pos[-1] + 1]
+            else:
+                h_pos.append(h_pos[0] + 1)
+            
+            if len(t_pos) > 1:
+                running_list = [i for i in range(min(t_pos), max(t_pos) + 1)]
+                assert t_pos == running_list
+                t_pos = [t_pos[0], t_pos[-1] + 1]
+            else:
+                t_pos.append(t_pos[0] + 1)
+            
+            if (t_pos[0] <= h_pos[-1] <= t_pos[-1]) or (h_pos[0] <= t_pos[-1] <= h_pos[-1]): # remove entities not separated by at least one token 
+                continue
+            
+            # add entity markers
+            if h_pos[-1] < t_pos[0]:
+                tokens = data['tokens'][:h_pos[0]] + ['[E1]'] + data['tokens'][h_pos[0]:h_pos[1]] \
+                        + ['[/E1]'] + data['tokens'][h_pos[1]:t_pos[0]] + ['[E2]'] + \
+                        data['tokens'][t_pos[0]:t_pos[1]] + ['[/E2]'] + data['tokens'][t_pos[1]:]
+            else:
+                tokens = data['tokens'][:t_pos[0]] + ['[E2]'] + data['tokens'][t_pos[0]:t_pos[1]] \
+                        + ['[/E2]'] + data['tokens'][t_pos[1]:h_pos[0]] + ['[E1]'] + \
+                        data['tokens'][h_pos[0]:h_pos[1]] + ['[/E1]'] + data['tokens'][h_pos[1]:]
+            
+            assert len(tokens) == (len(data['tokens']) + 4)
+            sents.append(tokens)
+            labels.append(relation)
+    
+    df_train = pd.DataFrame(data={'sents': sents, 'labels': labels})
+    
+    N = 5
+    K = 1
+    input_data = []
+    output_data = []
+    train_relations = train_data.keys()
+    sampled_relation = random.sample(train_relations, N)
+    target = random.choice(range(len(sampled_relation)))
+    output_data.append(target)
+    target_relation = sampled_relation[target]
+    meta_train = [random.sample(train_data[i], K) for i in sampled_relation]
+    meta_test = random.choice(train_data[target_relation])
+    input_data.append({"meta_train": meta_train, "meta_test": meta_test})
+    
+    return train_data, test_data, input_data, output_data
+
+class fewrel_dataset(Dataset):
+    def __init__(self, df):
+        self.df = df
+        self.relations = list(df['labels'].unique())
+        self.N = 5
+        self.K = 1
+        
+    def __len__(self,):
+        return len(self.df)
+    
+    def __getitem__(self, idx):
+        sampled_relation = random.sample(self.relations, self.N)
+        target_idx = random.choice(range(len(sampled_relation)))
+        target_relation = sampled_relation[target]
+        
+        for r in sampled_relation:
+            self.df[self.df['labels'] == r]
+        return
 
 def load_dataloaders(args):
     if args.model_no == 0:

@@ -31,7 +31,7 @@ main_pretraining.py [-h]
 ```
 
 ## Fine-tuning on SemEval2010 Task 8
-Run main_task.py with arguments below. Requires SemEval2010 Task 8 dataset, available [here.](https://github.com/sahitya0000/Relation-Classification/blob/master/corpus/SemEval2010_task8_all_data.zip)
+Run main_task.py with arguments below. Requires SemEval2010 Task 8 dataset, available [here.](https://github.com/sahitya0000/Relation-Classification/blob/master/corpus/SemEval2010_task8_all_data.zip) Download & unzip to ./data/ folder.
 
 ```bash
 main_task.py [-h] 

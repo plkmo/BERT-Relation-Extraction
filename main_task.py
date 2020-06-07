@@ -6,7 +6,7 @@ Created on Mon Dec  2 17:40:16 2019
 @author: weetee
 """
 
-from src.tasks.preprocessing_funcs import load_dataloaders
+from src.tasks.preprocessing_funcs import preprocess_fewrel
 from src.tasks.trainer import train_and_fit
 from src.tasks.infer import infer_from_trained
 import logging
@@ -57,3 +57,5 @@ if __name__ == "__main__":
             if sent.lower() in ['quit', 'exit']:
                 break
             inferer.infer_sentence(sent, detect_entities=False)
+
+    #train_data, test_data, input_data, output_data = preprocess_fewrel(args)
