@@ -31,7 +31,7 @@ main_pretraining.py [-h]
 	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2')]
 ```
 
-## Fine-tuning on SemEval2010 Task 8 (BERT<sub>EM</sub>)
+## Fine-tuning on SemEval2010 Task 8 (BERT<sub>EM</sub>/BERT<sub>EM</sub> + MTB)
 Run main_task.py with arguments below. Requires SemEval2010 Task 8 dataset, available [here.](https://github.com/sahitya0000/Relation-Classification/blob/master/corpus/SemEval2010_task8_all_data.zip) Download & unzip to ./data/ folder.
 
 ```bash
@@ -107,9 +107,9 @@ Run main_task.py with argument 'task' set as 'fewrel'.
 ```bash
 python main_task.py --task fewrel
 ```
-Results:
-5-way 1-shot  
-BERT<sub>EM</sub> without MTB, not trained on any FewRel data)  
+Results:  
+(5-way 1-shot)  
+BERT<sub>EM</sub> without MTB, not trained on any FewRel data  
 | Model size | Accuracy (41646 samples) |
 |------------|--------------------------|
 | bert-base-uncased  | 62.229 %         |
