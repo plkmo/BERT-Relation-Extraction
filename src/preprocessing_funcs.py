@@ -178,12 +178,12 @@ class pretrain_dataset(Dataset):
         
         if args.model_no == 0:
             from .model.BERT.tokenization_bert import BertTokenizer as Tokenizer
-            model = 'bert-base-uncased'
+            model = args.model_size #'bert-base-uncased'
             lower_case = True
             model_name = 'BERT'
         elif args.model_no == 1:
             from .model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
-            model = 'albert-base-v2'
+            model = args.model_size #'albert-base-v2'
             lower_case = False
             model_name = 'ALBERT'
         

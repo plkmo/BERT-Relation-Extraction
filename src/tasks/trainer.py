@@ -35,17 +35,18 @@ def train_and_fit(args):
     
     if args.model_no == 0:
         from ..model.BERT.modeling_bert import BertModel as Model
-        model = 'bert-base-uncased'
+        model = args.model_size #'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
     elif args.model_no == 1:
         from ..model.ALBERT.modeling_albert import AlbertModel as Model
-        model = 'albert-base-v2'
-        lower_case = False
+        model = args.model_size #'albert-base-v2'
+        lower_case = True
         model_name = 'ALBERT'
     
     net = Model.from_pretrained(model, force_download=False, \
-                                task='classification', n_classes_=args.num_classes)
+                                task='classification' if args.task != 'fewrel' else 'fewrel',\
+                                n_classes_=args.num_classes)
     
     tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer)) 

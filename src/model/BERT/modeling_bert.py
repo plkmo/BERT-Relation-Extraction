@@ -750,10 +750,11 @@ class BertModel(BertPreTrainedModel):
             blanks_logits = self.activation(v1v2) # self.blanks_linear(- torch.log(Q)
             lm_logits = self.cls(sequence_output)
             return blanks_logits, lm_logits
-        
         elif self.task == 'classification':
             classification_logits = self.classification_layer(v1v2)
             return classification_logits
+        elif self.task == 'fewrel':
+            return v1v2
 
         #outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
         

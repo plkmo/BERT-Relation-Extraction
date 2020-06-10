@@ -33,6 +33,9 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
     parser.add_argument("--model_no", type=int, default=0, help='''Model ID: 0 - BERT\n
                                                                             1 - ALBERT''')
+    parser.add_argument("--model_size", type=str, default='bert-base-uncased', help="For BERT: 'bert-base-uncased', \
+                                                                                                'bert-large-uncased',\
+                                                                                    For ALBERT: 'albert-base-v2'")
     
     args = parser.parse_args()
     

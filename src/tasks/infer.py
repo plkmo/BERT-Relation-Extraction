@@ -14,6 +14,8 @@ import spacy
 import re
 from itertools import permutations
 from tqdm import tqdm
+from .preprocessing_funcs import load_dataloaders
+
 import logging
 
 tqdm.pandas(desc="prog-bar")
@@ -47,19 +49,19 @@ class infer_from_trained(object):
         logger.info("Loading tokenizer and model...")
         from .train_funcs import load_state
         
-        if args.model_no == 0:
+        if self.args.model_no == 0:
             from ..model.BERT.modeling_bert import BertModel as Model
-            model = 'bert-base-uncased'
+            model = args.model_size #'bert-base-uncased'
             lower_case = True
             model_name = 'BERT'
-        elif args.model_no == 1:
+        elif self.args.model_no == 1:
             from ..model.ALBERT.modeling_albert import AlbertModel as Model
-            model = 'albert-base-v2'
+            model = args.model_size #'albert-base-v2'
             lower_case = False
             model_name = 'ALBERT'
         
         self.net = Model.from_pretrained(model, force_download=False, \
-                                         task='classification', n_classes_=args.num_classes)
+                                         task='classification', n_classes_=self.args.num_classes)
         self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
         if self.cuda:
@@ -181,10 +183,11 @@ class infer_from_trained(object):
             tokenized = tokenized.cuda()
             attention_mask = attention_mask.cuda()
             token_type_ids = token_type_ids.cuda()
-            
-        classification_logits = self.net(tokenized, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
-                                    e1_e2_start=e1_e2_start)
-        predicted = torch.softmax(classification_logits, dim=1).max(1)[1].item()
+        
+        with torch.no_grad():
+            classification_logits = self.net(tokenized, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
+                                        e1_e2_start=e1_e2_start)
+            predicted = torch.softmax(classification_logits, dim=1).max(1)[1].item()
         print("Sentence: ", sentence)
         print("Predicted: ", self.rm.idx2rel[predicted].strip(), '\n')
         return predicted
@@ -200,3 +203,70 @@ class infer_from_trained(object):
                 return preds
         else:
             return self.infer_one_sentence(sentence)
+
+class FewRel(object):
+    def __init__(self, args=None):
+        if args is None:
+            self.args = load_pickle("args.pkl")
+        else:
+            self.args = args
+        self.cuda = torch.cuda.is_available()
+        
+        if self.args.model_no == 0:
+            from ..model.BERT.modeling_bert import BertModel as Model
+            model = args.model_size #'bert-large-uncased' 'bert-base-uncased'
+            lower_case = True
+            model_name = 'BERT'
+        elif self.args.model_no == 1:
+            from ..model.ALBERT.modeling_albert import AlbertModel as Model
+            model = args.model_size #'albert-base-v2'
+            lower_case = False
+            model_name = 'ALBERT'
+        
+        self.net = Model.from_pretrained(model, force_download=False, \
+                                         task='fewrel')
+        self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+        self.net.resize_token_embeddings(len(self.tokenizer))
+        self.pad_id = self.tokenizer.pad_token_id
+        
+        if self.cuda:
+            self.net.cuda()
+        
+        if self.args.use_pretrained_blanks == 1:
+            logger.info("Loading model pre-trained on blanks at ./data/test_checkpoint_%d.pth.tar..." % args.model_no)
+            checkpoint_path = "./data/test_checkpoint_%d.pth.tar" % self.args.model_no
+            checkpoint = torch.load(checkpoint_path)
+            model_dict = self.net.state_dict()
+            pretrained_dict = {k: v for k, v in checkpoint['state_dict'].items() if k in model_dict.keys()}
+            model_dict.update(pretrained_dict)
+            self.net.load_state_dict(pretrained_dict, strict=False)
+            del checkpoint, pretrained_dict, model_dict
+        
+        logger.info("Loading Fewrel dataloaders...")
+        self.train_loader, _, self.train_length, _ = load_dataloaders(args)
+        
+    def evaluate(self):
+        counts, hits = 0, 0
+        logger.info("Evaluating...")
+        with torch.no_grad():
+            for meta_input, e1_e2_start, meta_labels in tqdm(self.train_loader, total=len(self.train_loader)):
+                attention_mask = (meta_input != self.pad_id).float()
+                token_type_ids = torch.zeros((meta_input.shape[0], meta_input.shape[1])).long()
+        
+                if self.cuda:
+                    meta_input = meta_input.cuda()
+                    attention_mask = attention_mask.cuda()
+                    token_type_ids = token_type_ids.cuda()
+                
+                outputs = self.net(meta_input, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
+                                  e1_e2_start=e1_e2_start)
+                
+                matrix_product = torch.mm(outputs, outputs.T)
+                closest_idx = matrix_product[-1][:-1].argmax().cpu().item()
+                
+                if closest_idx == meta_labels[-1].item():
+                    hits += 1
+                counts += 1
+        
+        print("Results (%d samples): %.3f %%" % (counts, (hits/counts)*100))
+        return meta_input, e1_e2_start, meta_labels, outputs

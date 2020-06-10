@@ -36,12 +36,12 @@ def train_and_fit(args):
     
     if args.model_no == 0:
         from .model.BERT.modeling_bert import BertModel as Model
-        model = 'bert-base-uncased'
+        model = args.model_size #'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
     elif args.model_no == 1:
         from .model.ALBERT.modeling_albert import AlbertModel as Model
-        model = 'albert-base-v2'
+        model = args.model_size #'albert-base-v2'
         lower_case = False
         model_name = 'ALBERT'
     
