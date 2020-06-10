@@ -10,7 +10,7 @@ Additional models for relation extraction, implemented here based on the paper's
 Requirements: Python (3.6+), PyTorch (1.2.0), Spacy (2.1.8)  
 Pre-trained BERT(S) model courtesy of HuggingFace.co (https://huggingface.co)
 
-## Training by matching the blanks (BERT<sup>EM</sup> + MTB)
+## Training by matching the blanks (BERT<sub>EM</sub> + MTB)
 Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.  
 We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens length) from the text to form relation statements for pre-training. Entities recognition are based on NER and dependency tree parsing of objects/subjects.  
 The pre-training data (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)
@@ -31,7 +31,7 @@ main_pretraining.py [-h]
 	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2')]
 ```
 
-## Fine-tuning on SemEval2010 Task 8 (BERT<sup>EM</sup>)
+## Fine-tuning on SemEval2010 Task 8 (BERT<sub>EM</sub>)
 Run main_task.py with arguments below. Requires SemEval2010 Task 8 dataset, available [here.](https://github.com/sahitya0000/Relation-Classification/blob/master/corpus/SemEval2010_task8_all_data.zip) Download & unzip to ./data/ folder.
 
 ```bash
@@ -107,7 +107,9 @@ Run main_task.py with argument 'task' set as 'fewrel'.
 ```bash
 python main_task.py --task fewrel
 ```
-Results (BERT<sup>EM</sup> without MTB, not trained on FewRel data):
+Results:
+5-way 1-shot  
+BERT<sub>EM</sub> without MTB, not trained on any FewRel data)  
 | Model size | Accuracy (41646 samples) |
 |------------|--------------------------|
 | bert-base-uncased  | 62.229 %         |
