@@ -45,6 +45,7 @@ def train_and_fit(args):
         model_name = 'ALBERT'
     
     net = Model.from_pretrained(model, force_download=False, \
+                                model_size=args.model_size,
                                 task='classification' if args.task != 'fewrel' else 'fewrel',\
                                 n_classes_=args.num_classes)
     

@@ -45,7 +45,8 @@ def train_and_fit(args):
         lower_case = False
         model_name = 'ALBERT'
     
-    net = Model.from_pretrained(model, force_download=False)
+    net = Model.from_pretrained(model, force_download=False, \
+                                model_size=args.model_size)
     tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer)) 
     if cuda:

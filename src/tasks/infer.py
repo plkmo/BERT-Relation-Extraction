@@ -61,6 +61,7 @@ class infer_from_trained(object):
             model_name = 'ALBERT'
         
         self.net = Model.from_pretrained(model, force_download=False, \
+                                         model_size=args.model_size,\
                                          task='classification', n_classes_=self.args.num_classes)
         self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
@@ -224,6 +225,7 @@ class FewRel(object):
             model_name = 'ALBERT'
         
         self.net = Model.from_pretrained(model, force_download=False, \
+                                         model_size=args.model_size,\
                                          task='fewrel')
         self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
