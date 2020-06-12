@@ -28,7 +28,7 @@ main_pretraining.py [-h]
 	[--num_epochs NUM_EPOCHS]
 	[--lr LR]
 	[--model_no MODEL_NO (0: BERT ; 1: ALBERT)]  
-	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2')]
+	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2', 'albert-large-v2')]
 ```
 
 ## Fine-tuning on SemEval2010 Task 8 (BERT<sub>EM</sub>/BERT<sub>EM</sub> + MTB)
@@ -47,7 +47,7 @@ main_task.py [-h]
 	[--num_epochs NUM_EPOCHS]
 	[--lr LR]
 	[--model_no MODEL_NO (0: BERT ; 1: ALBERT)]  
-	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2')]  
+	[--model_size MODEL_SIZE (BERT: 'bert-base-uncased', 'bert-large-uncased'; ALBERT: 'albert-base-v2', 'albert-large-v2')]  
 	[--train TRAIN]
 	[--infer INFER]
 ```

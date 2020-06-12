@@ -35,7 +35,8 @@ if __name__ == "__main__":
                                                                             1 - ALBERT''')
     parser.add_argument("--model_size", type=str, default='bert-base-uncased', help="For BERT: 'bert-base-uncased', \
                                                                                                 'bert-large-uncased',\
-                                                                                    For ALBERT: 'albert-base-v2'")
+                                                                                    For ALBERT: 'albert-base-v2',\
+                                                                                                'albert-large-v2'")
     
     args = parser.parse_args()
     

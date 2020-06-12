@@ -437,7 +437,7 @@ class AlbertModel(AlbertPreTrainedModel):
     load_tf_weights = load_tf_weights_in_albert
     base_model_prefix = "albert"
 
-    def __init__(self, config, task=None, n_classes_=None):
+    def __init__(self, config, model_size, task=None, n_classes_=None):
         super().__init__(config)
 
         self.config = config
@@ -449,6 +449,7 @@ class AlbertModel(AlbertPreTrainedModel):
         self.init_weights()
         
         self.task = task
+        self.model_size = model_size
         if self.task is None:
             ### blanks head ###
             #self.blanks_linear = nn.Linear(1536, 1)
@@ -460,7 +461,10 @@ class AlbertModel(AlbertPreTrainedModel):
             #self.lm_bias = nn.Parameter(torch.zeros(config.vocab_size))
         elif self.task == 'classification':
             self.n_classes_ = n_classes_
-            self.classification_layer = nn.Linear(1536, n_classes_)
+            if self.model_size == 'albert-base-v2':
+                self.classification_layer = nn.Linear(1536, n_classes_)
+            elif self.model_size == 'albert-large-v2':
+                self.classification_layer = nn.Linear(2048, n_classes_)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
