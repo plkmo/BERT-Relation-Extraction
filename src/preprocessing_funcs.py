@@ -192,10 +192,14 @@ class pretrain_dataset(Dataset):
             self.tokenizer = load_pickle('%s_tokenizer.pkl' % (model_name))
             logger.info("Loaded tokenizer from saved path.")
         else:
-            self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
+            self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
             self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
             save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
             logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
+        
+        e1_id = self.tokenizer.convert_tokens_to_ids('[E1]')
+        e2_id = self.tokenizer.convert_tokens_to_ids('[E2]')
+        assert e1_id != e2_id != 1
             
         self.cls_token = self.tokenizer.cls_token
         self.sep_token = self.tokenizer.sep_token

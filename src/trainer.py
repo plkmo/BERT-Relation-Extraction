@@ -48,7 +48,11 @@ def train_and_fit(args):
     net = Model.from_pretrained(model, force_download=False, \
                                 model_size=args.model_size)
     tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
-    net.resize_token_embeddings(len(tokenizer)) 
+    net.resize_token_embeddings(len(tokenizer))
+    e1_id = tokenizer.convert_tokens_to_ids('[E1]')
+    e2_id = tokenizer.convert_tokens_to_ids('[E2]')
+    assert e1_id != e2_id != 1
+    
     if cuda:
         net.cuda()
         

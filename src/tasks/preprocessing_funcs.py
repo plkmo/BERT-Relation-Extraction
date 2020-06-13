@@ -304,7 +304,7 @@ def load_dataloaders(args):
         logger.info("Loaded tokenizer from pre-trained blanks model")
     else:
         logger.info("Pre-trained blanks tokenizer not found, initializing new tokenizer...")
-        tokenizer = Tokenizer.from_pretrained(model, do_lower_case=lower_case)
+        tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
         tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
 
         save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer)
@@ -312,6 +312,7 @@ def load_dataloaders(args):
     
     e1_id = tokenizer.convert_tokens_to_ids('[E1]')
     e2_id = tokenizer.convert_tokens_to_ids('[E2]')
+    assert e1_id != e2_id != 1
     
     if args.task == 'semeval':
         relations_path = './data/relations.pkl'

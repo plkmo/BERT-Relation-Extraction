@@ -27,12 +27,12 @@ if __name__ == "__main__":
                         help="test data .txt file path")
     parser.add_argument("--use_pretrained_blanks", type=int, default=0, help="0: Don't use pre-trained blanks model, 1: use pre-trained blanks model")
     parser.add_argument("--num_classes", type=int, default=19, help='number of relation classes')
-    parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
-    parser.add_argument("--gradient_acc_steps", type=int, default=1, help="No. of steps of gradient accumulation")
+    parser.add_argument("--batch_size", type=int, default=16, help="Training batch size")
+    parser.add_argument("--gradient_acc_steps", type=int, default=2, help="No. of steps of gradient accumulation")
     parser.add_argument("--max_norm", type=float, default=1.0, help="Clipped gradient norm")
     parser.add_argument("--fp16", type=int, default=0, help="1: use mixed precision ; 0: use floating point 32") # mixed precision doesn't seem to train well
     parser.add_argument("--num_epochs", type=int, default=10, help="No of epochs")
-    parser.add_argument("--lr", type=float, default=0.00005, help="learning rate")
+    parser.add_argument("--lr", type=float, default=0.00007, help="learning rate")
     parser.add_argument("--model_no", type=int, default=0, help='''Model ID: 0 - BERT\n
                                                                             1 - ALBERT''')
     parser.add_argument("--model_size", type=str, default='bert-base-uncased', help="For BERT: 'bert-base-uncased', \
