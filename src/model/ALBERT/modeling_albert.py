@@ -605,6 +605,8 @@ class AlbertModel(AlbertPreTrainedModel):
         elif self.task == 'classification':
             classification_logits = self.classification_layer(v1v2)
             return classification_logits
+        elif self.task == 'fewrel':
+            return v1v2
         
         '''
         pooled_output = self.pooler_activation(self.pooler(sequence_output[:, 0]))
