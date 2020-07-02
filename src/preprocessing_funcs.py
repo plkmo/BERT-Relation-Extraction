@@ -186,13 +186,22 @@ class pretrain_dataset(Dataset):
             model = args.model_size #'albert-base-v2'
             lower_case = False
             model_name = 'ALBERT'
+        elif args.model_no == 2:
+            from .model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+            model = 'bert-base-uncased'
+            lower_case = False
+            model_name = 'BioBERT'
         
         tokenizer_path = './data/%s_tokenizer.pkl' % (model_name)
         if os.path.isfile(tokenizer_path):
             self.tokenizer = load_pickle('%s_tokenizer.pkl' % (model_name))
             logger.info("Loaded tokenizer from saved path.")
         else:
-            self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
+            if args.model_no == 2:
+                self.tokenizer = Tokenizer(vocab_file='./additional_models/biobert_v1.1_pubmed/vocab.txt',
+                                           do_lower_case=False)
+            else:
+                self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
             self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
             save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
             logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
@@ -289,6 +298,7 @@ class pretrain_dataset(Dataset):
             ### get positive samples
             r, e1, e2 = self.df.iloc[idx] # positive sample
             pool = self.df[((self.df['e1'] == e1) & (self.df['e2'] == e2))].index
+            pool = pool.append(self.df[((self.df['e1'] == e2) & (self.df['e2'] == e1))].index)
             pos_idxs = np.random.choice(pool, \
                                         size=min(int(self.batch_size//2), len(pool)), replace=False)
             ### get negative samples

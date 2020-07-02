@@ -15,6 +15,7 @@ import re
 from itertools import permutations
 from tqdm import tqdm
 from .preprocessing_funcs import load_dataloaders
+from ..misc import save_as_pickle
 
 import logging
 
@@ -54,15 +55,30 @@ class infer_from_trained(object):
             model = args.model_size #'bert-base-uncased'
             lower_case = True
             model_name = 'BERT'
+            self.net = Model.from_pretrained(model, force_download=False, \
+                                         model_size=args.model_size,\
+                                         task='classification', n_classes_=self.args.num_classes)
         elif self.args.model_no == 1:
             from ..model.ALBERT.modeling_albert import AlbertModel as Model
             model = args.model_size #'albert-base-v2'
             lower_case = False
             model_name = 'ALBERT'
-        
-        self.net = Model.from_pretrained(model, force_download=False, \
+            self.net = Model.from_pretrained(model, force_download=False, \
                                          model_size=args.model_size,\
                                          task='classification', n_classes_=self.args.num_classes)
+        elif args.model_no == 2: # BioBert
+            from ..model.BERT.modeling_bert import BertModel, BertConfig
+            model = 'bert-base-uncased'
+            lower_case = False
+            model_name = 'BioBERT'
+            config = BertConfig.from_pretrained('./additional_models/biobert_v1.1_pubmed/bert_config.json')
+            self.net = BertModel.from_pretrained(pretrained_model_name_or_path='./additional_models/biobert_v1.1_pubmed/biobert_v1.1_pubmed.bin', 
+                                                 config=config,
+                                                 force_download=False, \
+                                                 model_size='bert-base-uncased',
+                                                 task='classification',\
+                                                 n_classes_=self.args.num_classes)
+        
         self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
         if self.cuda:
@@ -215,19 +231,50 @@ class FewRel(object):
         
         if self.args.model_no == 0:
             from ..model.BERT.modeling_bert import BertModel as Model
+            from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
             model = args.model_size #'bert-large-uncased' 'bert-base-uncased'
             lower_case = True
             model_name = 'BERT'
+            self.net = Model.from_pretrained(model, force_download=False, \
+                                             model_size=args.model_size,\
+                                             task='fewrel')
         elif self.args.model_no == 1:
             from ..model.ALBERT.modeling_albert import AlbertModel as Model
+            from ..model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
             model = args.model_size #'albert-base-v2'
             lower_case = False
             model_name = 'ALBERT'
+            self.net = Model.from_pretrained(model, force_download=False, \
+                                             model_size=args.model_size,\
+                                             task='fewrel')
+        elif args.model_no == 2: # BioBert
+            from ..model.BERT.modeling_bert import BertModel, BertConfig
+            from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+            model = 'bert-base-uncased'
+            lower_case = False
+            model_name = 'BioBERT'
+            config = BertConfig.from_pretrained('./additional_models/biobert_v1.1_pubmed/bert_config.json')
+            self.net = BertModel.from_pretrained(pretrained_model_name_or_path='./additional_models/biobert_v1.1_pubmed/biobert_v1.1_pubmed.bin', 
+                                            config=config,
+                                            force_download=False, \
+                                            model_size='bert-base-uncased',
+                                            task='fewrel')
         
-        self.net = Model.from_pretrained(model, force_download=False, \
-                                         model_size=args.model_size,\
-                                         task='fewrel')
-        self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+        if os.path.isfile('./data/%s_tokenizer.pkl' % model_name):
+            self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+            logger.info("Loaded tokenizer from saved file.")
+        else:
+            logger.info("Saved tokenizer not found, initializing new tokenizer...")
+            if args.model_no == 2:
+                self.tokenizer = Tokenizer(vocab_file='./additional_models/biobert_v1.1_pubmed/vocab.txt',
+                                           do_lower_case=False)
+            else:
+                self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
+            self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
+            save_as_pickle("%s_tokenizer.pkl" % model_name, self.tokenizer)
+            logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" %(model_name, model_name))
+            
+        
         self.net.resize_token_embeddings(len(self.tokenizer))
         self.pad_id = self.tokenizer.pad_token_id
         

@@ -38,16 +38,31 @@ def train_and_fit(args):
         model = args.model_size #'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
+        net = Model.from_pretrained(model, force_download=False, \
+                                model_size=args.model_size,
+                                task='classification' if args.task != 'fewrel' else 'fewrel',\
+                                n_classes_=args.num_classes)
     elif args.model_no == 1:
         from ..model.ALBERT.modeling_albert import AlbertModel as Model
         model = args.model_size #'albert-base-v2'
         lower_case = True
         model_name = 'ALBERT'
-    
-    net = Model.from_pretrained(model, force_download=False, \
+        net = Model.from_pretrained(model, force_download=False, \
                                 model_size=args.model_size,
                                 task='classification' if args.task != 'fewrel' else 'fewrel',\
                                 n_classes_=args.num_classes)
+    elif args.model_no == 2: # BioBert
+        from ..model.BERT.modeling_bert import BertModel, BertConfig
+        model = 'bert-base-uncased'
+        lower_case = False
+        model_name = 'BioBERT'
+        config = BertConfig.from_pretrained('./additional_models/biobert_v1.1_pubmed/bert_config.json')
+        net = BertModel.from_pretrained(pretrained_model_name_or_path='./additional_models/biobert_v1.1_pubmed/biobert_v1.1_pubmed.bin', 
+                                          config=config,
+                                          force_download=False, \
+                                          model_size='bert-base-uncased',
+                                          task='classification' if args.task != 'fewrel' else 'fewrel',\
+                                          n_classes_=args.num_classes)
     
     tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer))
@@ -66,6 +81,9 @@ def train_and_fit(args):
         unfrozen_layers = ["classifier", "pooler", "classification_layer",\
                            "blanks_linear", "lm_linear", "cls",\
                            "albert_layer_groups.0.albert_layers.0.ffn"]
+    elif args.model_no == 2:
+        unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", \
+                           "classification_layer", "blanks_linear", "lm_linear", "cls"]
         
     for name, param in net.named_parameters():
         if not any([layer in name for layer in unfrozen_layers]):

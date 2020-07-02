@@ -7,5 +7,7 @@
 *.pth
 *.pyc
 *.pkl
+*.bin
 /data/*
+/additional_models/biobert_v1.1_pubmed/*
 /__pycache__/*

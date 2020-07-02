@@ -39,14 +39,26 @@ def train_and_fit(args):
         model = args.model_size #'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
+        net = Model.from_pretrained(model, force_download=False, \
+                                model_size=args.model_size)
     elif args.model_no == 1:
         from .model.ALBERT.modeling_albert import AlbertModel as Model
         model = args.model_size #'albert-base-v2'
         lower_case = False
         model_name = 'ALBERT'
-    
-    net = Model.from_pretrained(model, force_download=False, \
+        net = Model.from_pretrained(model, force_download=False, \
                                 model_size=args.model_size)
+    elif args.model_no == 2: # BioBert
+        from .model.BERT.modeling_bert import BertModel, BertConfig
+        model = 'bert-base-uncased'
+        lower_case = False
+        model_name = 'BioBERT'
+        config = BertConfig.from_pretrained('./additional_models/biobert_v1.1_pubmed/bert_config.json')
+        net = BertModel.from_pretrained(pretrained_model_name_or_path='./additional_models/biobert_v1.1_pubmed/biobert_v1.1_pubmed.bin', 
+                                          config=config,
+                                          force_download=False, \
+                                          model_size='bert-base-uncased')
+    
     tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer))
     e1_id = tokenizer.convert_tokens_to_ids('[E1]')
