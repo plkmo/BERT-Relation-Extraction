@@ -10,7 +10,7 @@ from torch.nn.utils import clip_grad_norm_
 from constants import LOG_DATETIME_FORMAT, LOG_FORMAT, LOG_LEVEL
 from src.misc import load_pickle, save_as_pickle
 from src.model.ALBERT.modeling_albert import AlbertModel
-from src.preprocessing_funcs import load_dataloaders
+from src.preprocessing_funcs import DataLoader
 from src.train_funcs import (
     Two_Headed_Loss,
     evaluate_,
@@ -28,8 +28,9 @@ class Pretrainer:
     def __init__(self, config):
         self.gradient_acc_steps = config.get("gradient_acc_steps")
         self.config = config
-        self.data_loader = load_dataloaders(self.config)
-        self.train_len = len(self.data_loader)
+        self.data_loader = DataLoader(self.config)
+        self.train_data = self.data_loader.load_dataset()
+        self.train_len = len(self.train_data)
 
     def train(self):
         train_on_gpu = torch.cuda.is_available()
@@ -76,7 +77,7 @@ class Pretrainer:
         logger.info("Starting training process...")
         pad_id = tokenizer.pad_token_id
         mask_id = tokenizer.mask_token_id
-        update_size = len(self.data_loader) // 10
+        update_size = len(self.train_data) // 10
         for epoch in range(start_epoch, self.config.get("epochs")):
             start_time = time.time()
             net.train()
@@ -84,7 +85,7 @@ class Pretrainer:
             losses_per_batch = []
             total_acc = 0.0
             lm_accuracy_per_batch = []
-            for i, data in enumerate(self.data_loader, 0):
+            for i, data in enumerate(self.train_data, 0):
                 (
                     x,
                     masked_for_pred,

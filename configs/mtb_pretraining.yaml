@@ -1,5 +1,6 @@
 # Data
 data: data/cnn-local.txt #pre-training data.txt file path
+max_len: 50000
 # Training
 batch_size: 32 # Training batch size
 gradient_acc_steps: 2 # steps of gradient accumulation

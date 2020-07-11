@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov 26 18:12:22 2019.
-
-@author: weetee
-"""
 import logging
 import math
 import os
 import re
 
+import joblib
 import numpy as np
 import pandas as pd
 import spacy
@@ -19,42 +13,115 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AlbertTokenizer
 
-from .misc import get_subject_objects, load_pickle, save_as_pickle
+from constants import LOG_DATETIME_FORMAT, LOG_FORMAT, LOG_LEVEL
+from src.misc import get_subject_objects, load_pickle, save_as_pickle
+
+logging.basicConfig(
+    format=LOG_FORMAT, datefmt=LOG_DATETIME_FORMAT, level=LOG_LEVEL,
+)
+logger = logging.getLogger(__file__)
 
 tqdm.pandas(desc="prog_bar")
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s]: %(message)s",
-    datefmt="%m/%d/%Y %I:%M:%S %p",
-    level=logging.INFO,
-)
-logger = logging.getLogger("__file__")
 
 
-def process_sent(sent):
-    if sent not in [" ", "\n", ""]:
-        sent = sent.strip("\n")
-        sent = re.sub(
-            "<[A-Z]+/*>", "", sent
-        )  # remove special tokens eg. <FIL/>, <S>
-        sent = re.sub(r"[\*\"\n\\…\+\-\/\=\(\)‘•€\[\]\|♫:;—”“~`#]", " ", sent)
-        sent = re.sub(" {2,}", " ", sent)  # remove extra spaces > 1
-        sent = re.sub("^ +", "", sent)  # remove space in front
-        sent = re.sub(r"([\.\?,!]){2,}", r"\1", sent)  # remove multiple puncs
-        sent = re.sub(
-            r" +([\.\?,!])", r"\1", sent
-        )  # remove extra spaces in front of punc
-        # sent = re.sub(r"([A-Z]{2,})", lambda x: x.group(1).capitalize(), sent) # Replace all CAPS with capitalize
-        return sent
-    return
+class DataLoader:
+    def __init__(self, config: dict):
+        """
+        DataLoader for MTB data.
+
+        Args:
+            config: configuration parameters
+        """
+        self.config = config
+
+    def load_dataset(self):
+        """
+        Load the data defined in the configuration parameters.
+        """
+        data_path = self.config.get("data")
+        data_file = os.path.basename(data_path)
+        data_file_name = os.path.splitext(data_file)[0]
+        preprocessed_file = os.path.join("data", data_file_name + ".pkl")
+
+        max_length = self.config.get("max_length", 50000)
+
+        if os.path.isfile(preprocessed_file):
+            logger.info("Loaded pre-training data from saved file")
+            with open(preprocessed_file, "rb") as pkl_file:
+                dataset = joblib.load(pkl_file)
+
+        else:
+            logger.info("Loading pre-training data...")
+            with open(data_path, "r", encoding="utf8") as f:
+                text = f.readlines()
+
+            text = self._process_textlines(text)
+
+            logger.info("Length of text (characters): {0}".format(len(text)))
+            num_chunks = math.ceil(len(text) / max_length)
+            logger.info(
+                "Splitting into {0} chunks of size {1}".format(
+                    num_chunks, max_length
+                )
+            )
+            text_chunks = (
+                text[i * max_length : (i * max_length + max_length)]
+                for i in range(num_chunks)
+            )
+
+            dataset = []
+            logger.info("Loading Spacy NLP")
+            nlp = spacy.load("en_core_web_lg")
+
+            for text_chunk in tqdm(text_chunks, total=num_chunks):
+                dataset.extend(
+                    create_pretraining_corpus(text_chunk, nlp, window_size=40)
+                )
+
+            logger.info(
+                "Total number of relation statements in pre-training corpus: {0}".format(
+                    len(dataset)
+                )
+            )
+            with open(preprocessed_file, "wb") as output:
+                joblib.dump(dataset, output)
+            logger.info(
+                "Saved pre-training corpus to {0}".format(preprocessed_file)
+            )
+
+        train_set = pretrain_dataset(
+            self.config, dataset, batch_size=self.config.get("batch_size")
+        )
+        return train_set
+
+    def _process_textlines(self, text):
+        text = [self._clean_sent(sent) for sent in text]
+        text = " ".join([t for t in text if t is not None])
+        text = re.sub(" {2,}", " ", text)
+        return text
+
+    @classmethod
+    def _clean_sent(cls, sent):
+        if sent not in {" ", "\n", ""}:
+            sent = sent.strip("\n")
+            sent = re.sub(
+                "<[A-Z]+/*>", "", sent
+            )  # remove special tokens eg. <FIL/>, <S>
+            sent = re.sub(
+                r"[\*\"\n\\…\+\-\/\=\(\)‘•€\[\]\|♫:;—”“~`#]", " ", sent
+            )
+            sent = " ".join(sent.split())  # remove whitespaces > 1
+            sent = sent.strip()
+            sent = re.sub(
+                r"([\.\?,!]){2,}", r"\1", sent
+            )  # remove multiple puncs
+            sent = re.sub(
+                r"([A-Z]{2,})", lambda x: x.group(1).capitalize(), sent
+            )  # Replace all CAPS with capitalize
+            return sent
 
 
-def process_textlines(text):
-    text = [process_sent(sent) for sent in text]
-    text = " ".join([t for t in text if t is not None])
-    text = re.sub(" {2,}", " ", text)  # remove extra spaces > 1
-    return text
-
-
+# TODO Refactor
 def create_pretraining_corpus(raw_text, nlp, window_size=40):
     """
     Input: Chunk of raw text
@@ -573,50 +640,3 @@ class Pad_Sequence:
             y3_lengths,
             y4_lengths,
         )
-
-
-def load_dataloaders(config, max_length=50000):
-    data_path = config.get("data")
-    if not os.path.isfile("./data/D.pkl"):
-        logger.info("Loading pre-training data...")
-        with open(data_path, "r", encoding="utf8") as f:
-            text = f.readlines()
-
-        # text = text[:1500] # restrict size for testing
-        text = process_textlines(text)
-
-        logger.info("Length of text (characters): %d" % len(text))
-        num_chunks = math.ceil(len(text) / max_length)
-        logger.info(
-            "Splitting into %d max length chunks of size %d"
-            % (num_chunks, max_length)
-        )
-        text_chunks = (
-            text[i * max_length : (i * max_length + max_length)]
-            for i in range(num_chunks)
-        )
-
-        D = []
-        logger.info("Loading Spacy NLP...")
-        nlp = spacy.load("en_core_web_lg")
-
-        for text_chunk in tqdm(text_chunks, total=num_chunks):
-            D.extend(
-                create_pretraining_corpus(text_chunk, nlp, window_size=40)
-            )
-
-        logger.info(
-            "Total number of relation statements in pre-training corpus: %d"
-            % len(D)
-        )
-        save_as_pickle("D.pkl", D)
-        logger.info("Saved pre-training corpus to %s" % "./data/D.pkl")
-    else:
-        logger.info("Loaded pre-training data from saved file")
-        D = load_pickle("D.pkl")
-
-    train_set = pretrain_dataset(
-        config, D, batch_size=config.get("batch_size")
-    )
-    len(train_set)
-    return train_set
