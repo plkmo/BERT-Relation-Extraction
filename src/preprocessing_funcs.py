@@ -91,7 +91,7 @@ class DataLoader:
                 "Saved pre-training corpus to {0}".format(preprocessed_file)
             )
 
-        train_set = pretrain_dataset(
+        train_set = PretrainDataset(
             self.config, dataset, batch_size=self.config.get("batch_size")
         )
         return train_set
@@ -143,15 +143,15 @@ class DataLoader:
         length_doc = len(sents_doc)
         data = []
         ents_list = []
-        for i in tqdm(range(len(ents))):
-            e1 = ents[i]
+        for e1_id, e1 in tqdm(enumerate(ents)):
             e1start = e1.start
             e1end = e1.end
             e1_has_numbers = re.search("[\d+]", e1.text)
             if (e1.label_ not in entities_of_interest) or e1_has_numbers:
                 continue
-            for j in range(1, len(ents) - i):
-                e2 = ents[i + j]
+            for e2_id, e2 in enumerate(ents):
+                if e1 == e2:
+                    continue
                 e2start = e2.start
                 e2end = e2.end
                 e2_has_numbers = re.search("[\d+]", e2.text)
@@ -263,22 +263,18 @@ class DataLoader:
         return data
 
 
-class pretrain_dataset(Dataset):
-    def __init__(self, args, D, batch_size=None):
-        self.internal_batching = True
-        self.batch_size = batch_size  # batch_size cannot be None if internal_batching == True
+class PretrainDataset(Dataset):
+    def __init__(self, dataset, batch_size=None):
+        self.batch_size = batch_size
         self.alpha = 0.7
         self.mask_probability = 0.15
 
-        self.df = pd.DataFrame(D, columns=["r", "e1", "e2"])
-        self.e1s = list(self.df["e1"].unique())
-        self.e2s = list(self.df["e2"].unique())
+        self.df = pd.DataFrame(dataset, columns=["r", "e1", "e2"])
 
-        model_name = "ALBERT"
-
-        tokenizer_path = "./data/%s_tokenizer.pkl" % (model_name)
+        tokenizer_path = "data/ALBERT_tokenizer.pkl"
         if os.path.isfile(tokenizer_path):
-            self.tokenizer = load_pickle("%s_tokenizer.pkl" % (model_name))
+            with open(tokenizer_path, 'rb') as pkl_file:
+                self.tokenizer = joblib.load(pkl_file)
             logger.info("Loaded tokenizer from saved path.")
         else:
             self.tokenizer = AlbertTokenizer.from_pretrained(
@@ -287,15 +283,14 @@ class pretrain_dataset(Dataset):
             self.tokenizer.add_tokens(
                 ["[E1]", "[/E1]", "[E2]", "[/E2]", "[BLANK]"]
             )
-            save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
-            logger.info(
-                "Saved %s tokenizer at ./data/%s_tokenizer.pkl"
-                % (model_name, model_name)
-            )
+            with open(tokenizer_path, 'wb') as output:
+                joblib.dump(self.tokenizer, output)
 
+            logger.info("Saved ALBERT tokenizer at {0}".format(tokenizer_path))
         e1_id = self.tokenizer.convert_tokens_to_ids("[E1]")
         e2_id = self.tokenizer.convert_tokens_to_ids("[E2]")
-        assert e1_id != e2_id != 1
+        if not e1_id != e2_id != 1:
+            raise ValueError("E1 token == E2 token == 1")
 
         self.cls_token = self.tokenizer.cls_token
         self.sep_token = self.tokenizer.sep_token
@@ -422,40 +417,64 @@ class pretrain_dataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        ### implements standard batching
-        if not self.internal_batching:
-            r, e1, e2 = self.df.iloc[idx]
-            x, masked_for_pred, e1_e2_start = self.tokenize(
-                self.put_blanks((r, e1, e2))
-            )
-            x = torch.tensor(x)
-            masked_for_pred = torch.tensor(masked_for_pred)
-            e1_e2_start = torch.tensor(e1_e2_start)
-            # e1, e2 = torch.tensor(e1), torch.tensor(e2)
-            return x, masked_for_pred, e1_e2_start, e1, e2
-
-        ### implements noise contrastive estimation
-        else:
-            ### get positive samples
-            r, e1, e2 = self.df.iloc[idx]  # positive sample
+        ### get positive samples
+        r, e1, e2 = self.df.iloc[idx]  # positive sample
+        pool = self.df[
+            ((self.df["e1"] == e1) & (self.df["e2"] == e2))
+        ].index
+        pool = pool.append(
+            self.df[((self.df["e1"] == e2) & (self.df["e2"] == e1))].index
+        )
+        pos_idxs = np.random.choice(
+            pool,
+            size=min(int(self.batch_size // 2), len(pool)),
+            replace=False,
+        )
+        ### get negative samples
+        """
+        choose from option: 
+        1) sampling uniformly from all negatives
+        2) sampling uniformly from negatives that share e1 or e2
+        """
+        if np.random.uniform() > 0.5:
             pool = self.df[
-                ((self.df["e1"] == e1) & (self.df["e2"] == e2))
+                ((self.df["e1"] != e1) | (self.df["e2"] != e2))
             ].index
-            pool = pool.append(
-                self.df[((self.df["e1"] == e2) & (self.df["e2"] == e1))].index
-            )
-            pos_idxs = np.random.choice(
+            neg_idxs = np.random.choice(
                 pool,
                 size=min(int(self.batch_size // 2), len(pool)),
                 replace=False,
             )
-            ### get negative samples
-            """
-            choose from option: 
-            1) sampling uniformly from all negatives
-            2) sampling uniformly from negatives that share e1 or e2
-            """
-            if np.random.uniform() > 0.5:
+            Q = 1 / len(pool)
+
+        else:
+            if np.random.uniform() > 0.5:  # share e1 but not e2
+                pool = self.df[
+                    ((self.df["e1"] == e1) & (self.df["e2"] != e2))
+                ].index
+                if len(pool) > 0:
+                    neg_idxs = np.random.choice(
+                        pool,
+                        size=min(int(self.batch_size // 2), len(pool)),
+                        replace=False,
+                    )
+                else:
+                    neg_idxs = []
+
+            else:  # share e2 but not e1
+                pool = self.df[
+                    ((self.df["e1"] != e1) & (self.df["e2"] == e2))
+                ].index
+                if len(pool) > 0:
+                    neg_idxs = np.random.choice(
+                        pool,
+                        size=min(int(self.batch_size // 2), len(pool)),
+                        replace=False,
+                    )
+                else:
+                    neg_idxs = []
+
+            if len(neg_idxs) == 0:  # if empty, sample from all negatives
                 pool = self.df[
                     ((self.df["e1"] != e1) | (self.df["e2"] != e2))
                 ].index
@@ -464,90 +483,52 @@ class pretrain_dataset(Dataset):
                     size=min(int(self.batch_size // 2), len(pool)),
                     replace=False,
                 )
-                Q = 1 / len(pool)
+            Q = 1 / len(pool)
 
-            else:
-                if np.random.uniform() > 0.5:  # share e1 but not e2
-                    pool = self.df[
-                        ((self.df["e1"] == e1) & (self.df["e2"] != e2))
-                    ].index
-                    if len(pool) > 0:
-                        neg_idxs = np.random.choice(
-                            pool,
-                            size=min(int(self.batch_size // 2), len(pool)),
-                            replace=False,
-                        )
-                    else:
-                        neg_idxs = []
-
-                else:  # share e2 but not e1
-                    pool = self.df[
-                        ((self.df["e1"] != e1) & (self.df["e2"] == e2))
-                    ].index
-                    if len(pool) > 0:
-                        neg_idxs = np.random.choice(
-                            pool,
-                            size=min(int(self.batch_size // 2), len(pool)),
-                            replace=False,
-                        )
-                    else:
-                        neg_idxs = []
-
-                if len(neg_idxs) == 0:  # if empty, sample from all negatives
-                    pool = self.df[
-                        ((self.df["e1"] != e1) | (self.df["e2"] != e2))
-                    ].index
-                    neg_idxs = np.random.choice(
-                        pool,
-                        size=min(int(self.batch_size // 2), len(pool)),
-                        replace=False,
-                    )
-                Q = 1 / len(pool)
-
-            batch = []
-            ## process positive sample
-            pos_df = self.df.loc[pos_idxs]
-            for idx, row in pos_df.iterrows():
-                r, e1, e2 = row[0], row[1], row[2]
-                x, masked_for_pred, e1_e2_start = self.tokenize(
-                    self.put_blanks((r, e1, e2))
+        batch = []
+        ## process positive sample
+        pos_df = self.df.loc[pos_idxs]
+        for idx, row in pos_df.iterrows():
+            r, e1, e2 = row[0], row[1], row[2]
+            x, masked_for_pred, e1_e2_start = self.tokenize(
+                self.put_blanks((r, e1, e2))
+            )
+            x = torch.LongTensor(x)
+            masked_for_pred = torch.LongTensor(masked_for_pred)
+            e1_e2_start = torch.tensor(e1_e2_start)
+            # e1, e2 = torch.tensor(e1), torch.tensor(e2)
+            batch.append(
+                (
+                    x,
+                    masked_for_pred,
+                    e1_e2_start,
+                    torch.FloatTensor([1.0]),
+                    torch.LongTensor([1]),
                 )
-                x = torch.LongTensor(x)
-                masked_for_pred = torch.LongTensor(masked_for_pred)
-                e1_e2_start = torch.tensor(e1_e2_start)
-                # e1, e2 = torch.tensor(e1), torch.tensor(e2)
-                batch.append(
-                    (
-                        x,
-                        masked_for_pred,
-                        e1_e2_start,
-                        torch.FloatTensor([1.0]),
-                        torch.LongTensor([1]),
-                    )
-                )
+            )
 
-            ## process negative samples
-            negs_df = self.df.loc[neg_idxs]
-            for idx, row in negs_df.iterrows():
-                r, e1, e2 = row[0], row[1], row[2]
-                x, masked_for_pred, e1_e2_start = self.tokenize(
-                    self.put_blanks((r, e1, e2))
+        ## process negative samples
+        negs_df = self.df.loc[neg_idxs]
+        for idx, row in negs_df.iterrows():
+            r, e1, e2 = row[0], row[1], row[2]
+            x, masked_for_pred, e1_e2_start = self.tokenize(
+                self.put_blanks((r, e1, e2))
+            )
+            x = torch.LongTensor(x)
+            masked_for_pred = torch.LongTensor(masked_for_pred)
+            e1_e2_start = torch.tensor(e1_e2_start)
+            # e1, e2 = torch.tensor(e1), torch.tensor(e2)
+            batch.append(
+                (
+                    x,
+                    masked_for_pred,
+                    e1_e2_start,
+                    torch.FloatTensor([Q]),
+                    torch.LongTensor([0]),
                 )
-                x = torch.LongTensor(x)
-                masked_for_pred = torch.LongTensor(masked_for_pred)
-                e1_e2_start = torch.tensor(e1_e2_start)
-                # e1, e2 = torch.tensor(e1), torch.tensor(e2)
-                batch.append(
-                    (
-                        x,
-                        masked_for_pred,
-                        e1_e2_start,
-                        torch.FloatTensor([Q]),
-                        torch.LongTensor([0]),
-                    )
-                )
-            batch = self.PS(batch)
-            return batch
+            )
+        batch = self.PS(batch)
+        return batch
 
 
 class Pad_Sequence:
