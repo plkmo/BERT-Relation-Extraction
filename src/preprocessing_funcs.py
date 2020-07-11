@@ -2,26 +2,23 @@ import logging
 import math
 import os
 import re
-
+from ml_utils.normalizer import Normalizer
 import joblib
 import numpy as np
 import pandas as pd
 import spacy
-import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AlbertTokenizer
-
+import torch
 from constants import LOG_DATETIME_FORMAT, LOG_FORMAT, LOG_LEVEL
-from src.misc import get_subject_objects, load_pickle, save_as_pickle
+from src.misc import get_subject_objects
 
 logging.basicConfig(
     format=LOG_FORMAT, datefmt=LOG_DATETIME_FORMAT, level=LOG_LEVEL,
 )
 logger = logging.getLogger(__file__)
-
-tqdm.pandas(desc="prog_bar")
 
 
 class DataLoader:
@@ -33,6 +30,43 @@ class DataLoader:
             config: configuration parameters
         """
         self.config = config
+
+        tokenizer_path = "data/ALBERT_tokenizer.pkl"
+        if os.path.isfile(tokenizer_path):
+            with open(tokenizer_path, 'rb') as pkl_file:
+                self.tokenizer = joblib.load(pkl_file)
+            logger.info("Loaded tokenizer from saved path.")
+        else:
+            self.tokenizer = AlbertTokenizer.from_pretrained(
+                "albert-large-v2", do_lower_case=False
+            )
+            self.tokenizer.add_tokens(
+                ["[E1]", "[/E1]", "[E2]", "[/E2]", "[BLANK]"]
+            )
+            with open(tokenizer_path, 'wb') as output:
+                joblib.dump(self.tokenizer, output)
+
+            logger.info("Saved ALBERT tokenizer at {0}".format(tokenizer_path))
+        e1_id = self.tokenizer.convert_tokens_to_ids("[E1]")
+        e2_id = self.tokenizer.convert_tokens_to_ids("[E2]")
+        if not e1_id != e2_id != 1:
+            raise ValueError("E1 token == E2 token == 1")
+
+        self.cls_token = self.tokenizer.cls_token
+        self.sep_token = self.tokenizer.sep_token
+        self.E1_token_id = self.tokenizer.encode("[E1]")[1:-1][0]
+        self.E1s_token_id = self.tokenizer.encode("[/E1]")[1:-1][0]
+        self.E2_token_id = self.tokenizer.encode("[E2]")[1:-1][0]
+        self.E2s_token_id = self.tokenizer.encode("[/E2]")[1:-1][0]
+        self.pad_token_id = self.tokenizer.pad_token_id
+
+        self.normalizer = Normalizer("en", config.get("normalization", []))
+        self.data = self.load_dataset()
+        self.train_generator = PretrainDataset(self.data, batch_size=self.config.get("batch_size"))
+
+        self.batch_size = config.get("batch_size")
+        self.alpha = 0.7
+        self.mask_probability = 0.15
 
     def load_dataset(self):
         """
@@ -48,7 +82,7 @@ class DataLoader:
         if os.path.isfile(preprocessed_file):
             logger.info("Loaded pre-training data from saved file")
             with open(preprocessed_file, "rb") as pkl_file:
-                dataset = joblib.load(pkl_file)
+                data = joblib.load(pkl_file)
 
         else:
             logger.info("Loading pre-training data...")
@@ -85,16 +119,110 @@ class DataLoader:
                     len(dataset)
                 )
             )
+            dataset = pd.DataFrame(dataset)
+            dataset.columns = ["r", "e1", "e2"]
+
+            data = self.preprocess(dataset)
             with open(preprocessed_file, "wb") as output:
-                joblib.dump(dataset, output)
+                joblib.dump(data, output)
             logger.info(
                 "Saved pre-training corpus to {0}".format(preprocessed_file)
             )
+        return data
 
-        train_set = PretrainDataset(
-            self.config, dataset, batch_size=self.config.get("batch_size")
-        )
-        return train_set
+    def preprocess(self, data: pd.DataFrame):
+        logger.info("Normalizing relations")
+        normalized_relations = []
+        for _idx, row in data.iterrows():
+            relation = self._add_special_tokens(row)
+            normalized_relations.append(relation)
+
+        logger.info("Tokenizing relations")
+        tokenized_relations = [
+            torch.IntTensor(self.tokenizer.convert_tokens_to_ids(n))
+            for n in normalized_relations
+        ]
+        tokenized_relations = pad_sequence(
+                tokenized_relations, batch_first=True, padding_value=self.pad_token_id
+            )
+        e_span1 = [(r[1][0] + 2, r[1][1] + 2) for r in data["r"]]
+        e_span2 = [(r[2][0] + 4, r[2][1] + 4) for r in data["r"]]
+        r = [
+            (tr.numpy().tolist(), e1, e2)
+            for tr, e1, e2 in zip(tokenized_relations, e_span1, e_span2)
+        ]
+        data["r"] = r
+        pools = self.transform_data(data)
+        preprocessed_data = {
+            "entities_pools": pools,
+            "tokenized_relations": data,
+        }
+        return preprocessed_data
+
+    def _add_special_tokens(self, row):
+        r = row.get("r")[0]
+        e_span1 = row.get("r")[1]
+        e_span2 = row.get("r")[2]
+        relation = [self.tokenizer.cls_token]
+        for w_idx, w in enumerate(r):
+            if w_idx == e_span1[0]:
+                relation.append("[E1]")
+            if w_idx == e_span2[0]:
+                relation.append("[E2]")
+            relation.append(self.normalizer.normalize(w))
+            if w_idx == e_span1[1]:
+                relation.append("[/E1]")
+            if w_idx == e_span2[1]:
+                relation.append("[/E2]")
+        relation.append(self.tokenizer.sep_token)
+        return relation
+
+    @classmethod
+    def transform_data(cls, df: pd.DataFrame):
+        """
+        Prepare data for the QQModel.
+
+        Data format:     Question pairs1.     Question pairs2. Negative
+        question pool per question.
+
+        Args:
+            df: Dataframe to use to generate QQ pairs.
+        """
+        df["relation_id"] = np.arange(0, len(df))
+        logger.info("Generating class pools")
+        return DataLoader.generate_entities_pools(df)
+
+    @classmethod
+    def generate_entities_pools(cls, data: pd.DataFrame):
+        """
+        Generate class pools.
+
+        Args:
+            data: pandas dataframe containing the relation, entity 1 & 2 and the relation id
+
+        Returns:
+            Index of question.
+            Index of paired question.
+            Common answer id.
+        """
+        groups = data.groupby(["e1", "e2"])
+        pool = []
+        for idx, df in groups:
+            e1, e2 = idx
+            e1_negatives = data[((data["e1"] == e1) & (data["e2"] != e2))][
+                "relation_id"
+            ]
+            e2_negatives = data[((data["e1"] != e1) & (data["e2"] == e2))][
+                "relation_id"
+            ]
+            entities_pool = (
+                df["relation_id"].values.tolist(),
+                e1_negatives.values.tolist(),
+                e2_negatives.values.tolist(),
+            )
+            pool.append(entities_pool)
+        logger.info("Found {0} different pools".format(len(pool)))
+        return pool
 
     def _process_textlines(self, text):
         text = [self._clean_sent(sent) for sent in text]
@@ -405,19 +533,12 @@ class PretrainDataset(Dataset):
 
         x = self.tokenizer.convert_tokens_to_ids(x)
         masked_for_pred = self.tokenizer.convert_tokens_to_ids(masked_for_pred)
-        """
-        e1 = [e for idx, e in enumerate(x) if idx in [i for i in\
-              range(x.index(self.E1_token_id) + 1, x.index(self.E1s_token_id))]]
-        e2 = [e for idx, e in enumerate(x) if idx in [i for i in\
-              range(x.index(self.E2_token_id) + 1, x.index(self.E2s_token_id))]]
-        """
         return x, masked_for_pred, e1_e2_start  # , e1, e2
 
     def __len__(self):
         return len(self.df)
 
     def __getitem__(self, idx):
-        ### get positive samples
         r, e1, e2 = self.df.iloc[idx]  # positive sample
         pool = self.df[
             ((self.df["e1"] == e1) & (self.df["e2"] == e2))
