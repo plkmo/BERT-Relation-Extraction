@@ -1,6 +1,18 @@
 # Data
 data: data/cnn-local.txt #pre-training data.txt file path
 max_len: 50000
+entities_of_interest:
+  - PERSON
+  - NORP
+  - FAC
+  - ORG
+  - GPE
+  - LOC
+  - PRODUCT
+  - EVENT
+  - WORK_OF_ART
+  - LAW
+  - LANGUAGE
 # Training
 batch_size: 32 # Training batch size
 gradient_acc_steps: 2 # steps of gradient accumulation

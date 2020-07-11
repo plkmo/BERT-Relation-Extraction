@@ -75,11 +75,13 @@ class DataLoader:
 
             for text_chunk in tqdm(text_chunks, total=num_chunks):
                 dataset.extend(
-                    create_pretraining_corpus(text_chunk, nlp, window_size=40)
+                    self.create_pretraining_dataset(
+                        text_chunk, nlp, window_size=40
+                    )
                 )
 
             logger.info(
-                "Total number of relation statements in pre-training corpus: {0}".format(
+                "Number of relation statements in corpus: {0}".format(
                     len(dataset)
                 )
             )
@@ -120,173 +122,145 @@ class DataLoader:
             )  # Replace all CAPS with capitalize
             return sent
 
+    def create_pretraining_dataset(
+        self, raw_text: str, nlp, window_size: int = 40
+    ):
+        """
+        Input: Chunk of raw text
+        Output: modified corpus of triplets (relation statement, entity1, entity2)
 
-# TODO Refactor
-def create_pretraining_corpus(raw_text, nlp, window_size=40):
-    """
-    Input: Chunk of raw text
-    Output: modified corpus of triplets (relation statement, entity1, entity2)
-    """
-    logger.info("Processing sentences...")
-    sents_doc = nlp(raw_text)
-    ents = sents_doc.ents  # get entities
+        Args:
+            raw_text: Raw text input
+            nlp: spacy NLP model
+            window_size: Maximum windows size between to entities
+        """
+        logger.info("Processing sentences...")
+        sents_doc = nlp(raw_text)
+        ents = sents_doc.ents  # get entities
 
-    logger.info("Processing relation statements by entities...")
-    entities_of_interest = [
-        "PERSON",
-        "NORP",
-        "FAC",
-        "ORG",
-        "GPE",
-        "LOC",
-        "PRODUCT",
-        "EVENT",
-        "WORK_OF_ART",
-        "LAW",
-        "LANGUAGE",
-    ]
-    length_doc = len(sents_doc)
-    D = []
-    ents_list = []
-    for i in tqdm(range(len(ents))):
-        e1 = ents[i]
-        e1start = e1.start
-        e1end = e1.end
-        if e1.label_ not in entities_of_interest:
-            continue
-        if re.search("[\d+]", e1.text):  # entities should not contain numbers
-            continue
-
-        for j in range(1, len(ents) - i):
-            e2 = ents[i + j]
-            e2start = e2.start
-            e2end = e2.end
-            if e2.label_ not in entities_of_interest:
+        logger.info("Processing relation statements by entities...")
+        entities_of_interest = self.config.get("entities_of_interest")
+        length_doc = len(sents_doc)
+        data = []
+        ents_list = []
+        for i in tqdm(range(len(ents))):
+            e1 = ents[i]
+            e1start = e1.start
+            e1end = e1.end
+            e1_has_numbers = re.search("[\d+]", e1.text)
+            if (e1.label_ not in entities_of_interest) or e1_has_numbers:
                 continue
-            if re.search(
-                "[\d+]", e2.text
-            ):  # entities should not contain numbers
-                continue
-            if e1.text.lower() == e2.text.lower():  # make sure e1 != e2
-                continue
-
-            if (
-                1 <= (e2start - e1end) <= window_size
-            ):  # check if next nearest entity within window_size
-                # Find start of sentence
-                punc_token = False
-                start = e1start - 1
-                if start > 0:
-                    while not punc_token:
-                        punc_token = sents_doc[start].is_punct
-                        start -= 1
-                        if start < 0:
-                            break
-                    left_r = start + 2 if start > 0 else 0
-                else:
-                    left_r = 0
-
-                # Find end of sentence
-                punc_token = False
-                start = e2end
-                if start < length_doc:
-                    while not punc_token:
-                        punc_token = sents_doc[start].is_punct
-                        start += 1
-                        if start == length_doc:
-                            break
-                    right_r = start if start < length_doc else length_doc
-                else:
-                    right_r = length_doc
+            for j in range(1, len(ents) - i):
+                e2 = ents[i + j]
+                e2start = e2.start
+                e2end = e2.end
+                e2_has_numbers = re.search("[\d+]", e2.text)
+                if (e2.label_ not in entities_of_interest) or e2_has_numbers:
+                    continue
+                if e1.text.lower() == e2.text.lower():  # make sure e1 != e2
+                    continue
 
                 if (
-                    right_r - left_r
-                ) > window_size:  # sentence should not be longer than window_size
-                    continue
+                    1 <= (e2start - e1end) <= window_size
+                ):  # check if next nearest entity within window_size
+                    # Find start of sentence
+                    punc_token = False
+                    start = e1start - 1
+                    if start > 0:
+                        while not punc_token:
+                            punc_token = sents_doc[start].is_punct
+                            start -= 1
+                            if start < 0:
+                                break
+                        left_r = start + 2 if start > 0 else 0
+                    else:
+                        left_r = 0
 
-                x = [token.text for token in sents_doc[left_r:right_r]]
+                    # Find end of sentence
+                    punc_token = False
+                    start = e2end
+                    if start < length_doc:
+                        while not punc_token:
+                            punc_token = sents_doc[start].is_punct
+                            start += 1
+                            if start == length_doc:
+                                break
+                        right_r = start if start < length_doc else length_doc
+                    else:
+                        right_r = length_doc
 
-                ### empty strings check ###
-                for token in x:
-                    assert len(token) > 0
-                assert len(e1.text) > 0
-                assert len(e2.text) > 0
-                assert e1start != e1end
-                assert e2start != e2end
-                assert (e2start - e1end) > 0
+                    if (
+                        right_r - left_r
+                    ) > window_size:  # sentence should not be longer than window_size
+                        continue
 
-                r = (
-                    x,
-                    (e1start - left_r, e1end - left_r),
-                    (e2start - left_r, e2end - left_r),
-                )
-                D.append((r, e1.text, e2.text))
-                ents_list.append((e1.text, e2.text))
-                # print(e1.text,",", e2.text)
-    print("Processed dataset samples from named entity extraction:")
-    samples_D_idx = np.random.choice(
-        [idx for idx in range(len(D))], size=min(3, len(D)), replace=False
-    )
-    for idx in samples_D_idx:
-        print(D[idx], "\n")
-    ref_D = len(D)
+                    x = [token.text for token in sents_doc[left_r:right_r]]
 
-    logger.info("Processing relation statements by dependency tree parsing...")
-    doc_sents = [s for s in sents_doc.sents]
-    for sent_ in tqdm(doc_sents, total=len(doc_sents)):
-        if len(sent_) > (window_size + 1):
-            continue
+                    empty_token = any(len(token) < 1 for token in x)
+                    emtpy_e1 = len(e1.text) < 1
+                    emtpy_e2 = len(e2.text) < 1
+                    emtpy_span = (e2start - e1end) < 1
+                    if emtpy_e1 or emtpy_e2 or emtpy_span or empty_token:
+                        raise ValueError("Relation has wrong format")
 
-        left_r = sent_[0].i
-        pairs = get_subject_objects(sent_)
-
-        if len(pairs) > 0:
-            for pair in pairs:
-                e1, e2 = pair[0], pair[1]
-
-                if (len(e1) > 3) or (
-                    len(e2) > 3
-                ):  # don't want entities that are too long
-                    continue
-
-                e1text, e2text = (
-                    " ".join(w.text for w in e1)
-                    if isinstance(e1, list)
-                    else e1.text,
-                    " ".join(w.text for w in e2)
-                    if isinstance(e2, list)
-                    else e2.text,
-                )
-                e1start, e1end = (
-                    e1[0].i if isinstance(e1, list) else e1.i,
-                    e1[-1].i + 1 if isinstance(e1, list) else e1.i + 1,
-                )
-                e2start, e2end = (
-                    e2[0].i if isinstance(e2, list) else e2.i,
-                    e2[-1].i + 1 if isinstance(e2, list) else e2.i + 1,
-                )
-                if (e1end < e2start) and ((e1text, e2text) not in ents_list):
-                    assert e1start != e1end
-                    assert e2start != e2end
-                    assert (e2start - e1end) > 0
                     r = (
-                        [w.text for w in sent_],
+                        x,
                         (e1start - left_r, e1end - left_r),
                         (e2start - left_r, e2end - left_r),
                     )
-                    D.append((r, e1text, e2text))
-                    ents_list.append((e1text, e2text))
+                    data.append((r, e1.text, e2.text))
+                    ents_list.append((e1.text, e2.text))
 
-    print("Processed dataset samples from dependency tree parsing:")
-    if (len(D) - ref_D) > 0:
-        samples_D_idx = np.random.choice(
-            [idx for idx in range(ref_D, len(D))],
-            size=min(3, (len(D) - ref_D)),
-            replace=False,
+        logger.info(
+            "Processing relation statements by dependency tree parsing..."
         )
-        for idx in samples_D_idx:
-            print(D[idx], "\n")
-    return D
+        doc_sents = [s for s in sents_doc.sents]
+        for sent_ in tqdm(doc_sents, total=len(doc_sents)):
+            if len(sent_) > (window_size + 1):
+                continue
+
+            left_r = sent_[0].i
+            pairs = get_subject_objects(sent_)
+
+            if len(pairs) > 0:
+                for pair in pairs:
+                    e1, e2 = pair[0], pair[1]
+
+                    if (len(e1) > 3) or (
+                        len(e2) > 3
+                    ):  # don't want entities that are too long
+                        continue
+
+                    e1text, e2text = (
+                        " ".join(w.text for w in e1)
+                        if isinstance(e1, list)
+                        else e1.text,
+                        " ".join(w.text for w in e2)
+                        if isinstance(e2, list)
+                        else e2.text,
+                    )
+                    e1start, e1end = (
+                        e1[0].i if isinstance(e1, list) else e1.i,
+                        e1[-1].i + 1 if isinstance(e1, list) else e1.i + 1,
+                    )
+                    e2start, e2end = (
+                        e2[0].i if isinstance(e2, list) else e2.i,
+                        e2[-1].i + 1 if isinstance(e2, list) else e2.i + 1,
+                    )
+                    if (e1end < e2start) and (
+                        (e1text, e2text) not in ents_list
+                    ):
+                        assert e1start != e1end
+                        assert e2start != e2end
+                        assert (e2start - e1end) > 0
+                        r = (
+                            [w.text for w in sent_],
+                            (e1start - left_r, e1end - left_r),
+                            (e2start - left_r, e2end - left_r),
+                        )
+                        data.append((r, e1text, e2text))
+                        ents_list.append((e1text, e2text))
+        return data
 
 
 class pretrain_dataset(Dataset):
