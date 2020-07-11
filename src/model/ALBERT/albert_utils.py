@@ -36,15 +36,14 @@ ACT2FN = {
 }
 
 
-BertLayerNorm = torch.nn.LayerNorm
-
-
 class BertEmbeddings(nn.Module):
-    """
-    Construct the embeddings from word, position and token_type embeddings.
-    """
-
     def __init__(self, config):
+        """
+        Construct the embeddings from word, position and token_type embeddings.
+
+        Args:
+            config: Huggingface Transformer configuration
+        """
         super().__init__()
         self.word_embeddings = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=0
@@ -56,7 +55,7 @@ class BertEmbeddings(nn.Module):
             config.type_vocab_size, config.hidden_size
         )
 
-        self.LayerNorm = BertLayerNorm(
+        self.LayerNorm = torch.nn.LayerNorm(
             config.hidden_size, eps=config.layer_norm_eps
         )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -114,11 +113,19 @@ class BertEmbeddings(nn.Module):
 
 class BertSelfAttention(nn.Module):
     def __init__(self, config):
+        """
+        Bert Model Self attention.
+
+        Args:
+            config: Huggingface Transformer configuration
+        """
         super().__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
-                "The hidden size (%d) is not a multiple of the number of attention "
-                "heads (%d)" % (config.hidden_size, config.num_attention_heads)
+                "Hidden size {0} ".format(config.hidden_size)
+                + "is not a multiple # attention heads {0}".format(
+                    config.num_attention_heads
+                )
             )
         self.output_attentions = config.output_attentions
 
@@ -137,6 +144,12 @@ class BertSelfAttention(nn.Module):
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
+        """
+        Transpose tensor to calculate scores.
+
+        Args:
+            x: input tensor
+        """
         new_x_shape = x.size()[:-1] + (
             self.num_attention_heads,
             self.attention_head_size,

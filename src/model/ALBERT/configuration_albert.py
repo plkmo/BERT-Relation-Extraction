@@ -13,10 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" ALBERT model configuration """
+"""
+ALBERT model configuration.
+"""
 
 from .configuration_utils import PretrainedConfig
-
 
 ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "albert-base-v1": "https://s3.amazonaws.com/models.huggingface.co/bert/albert-base-config.json",
@@ -116,7 +117,7 @@ class AlbertConfig(PretrainedConfig):
         num_attention_heads=64,
         intermediate_size=16384,
         inner_group_num=1,
-        hidden_act="gelu_new",
+        hidden_act="gelu",
         hidden_dropout_prob=0,
         attention_probs_dropout_prob=0,
         max_position_embeddings=512,

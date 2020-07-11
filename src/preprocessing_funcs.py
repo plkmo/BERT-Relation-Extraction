@@ -575,11 +575,11 @@ class Pad_Sequence:
         )
 
 
-def load_dataloaders(args, max_length=50000):
-
+def load_dataloaders(config, max_length=50000):
+    data_path = config.get("data")
     if not os.path.isfile("./data/D.pkl"):
         logger.info("Loading pre-training data...")
-        with open(args.pretrain_data, "r", encoding="utf8") as f:
+        with open(data_path, "r", encoding="utf8") as f:
             text = f.readlines()
 
         # text = text[:1500] # restrict size for testing
@@ -615,16 +615,8 @@ def load_dataloaders(args, max_length=50000):
         logger.info("Loaded pre-training data from saved file")
         D = load_pickle("D.pkl")
 
-    train_set = pretrain_dataset(args, D, batch_size=args.batch_size)
+    train_set = pretrain_dataset(
+        config, D, batch_size=config.get("batch_size")
+    )
     len(train_set)
-    """
-    # if using fixed batching
-    PS = Pad_Sequence(seq_pad_value=train_set.tokenizer.pad_token_id,\
-                      label_pad_value=train_set.tokenizer.pad_token_id,\
-                      label2_pad_value=-1,\
-                      label3_pad_value=-1,\
-                      label4_pad_value=-1)
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, \
-                              num_workers=0, collate_fn=PS, pin_memory=False)
-    """
     return train_set
