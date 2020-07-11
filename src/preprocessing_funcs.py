@@ -1,17 +1,20 @@
+import itertools
 import logging
 import math
 import os
 import re
-from ml_utils.normalizer import Normalizer
+
 import joblib
 import numpy as np
 import pandas as pd
 import spacy
+import torch
+from ml_utils.normalizer import Normalizer
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AlbertTokenizer
-import torch
+
 from constants import LOG_DATETIME_FORMAT, LOG_FORMAT, LOG_LEVEL
 from src.misc import get_subject_objects
 
@@ -33,7 +36,7 @@ class DataLoader:
 
         tokenizer_path = "data/ALBERT_tokenizer.pkl"
         if os.path.isfile(tokenizer_path):
-            with open(tokenizer_path, 'rb') as pkl_file:
+            with open(tokenizer_path, "rb") as pkl_file:
                 self.tokenizer = joblib.load(pkl_file)
             logger.info("Loaded tokenizer from saved path.")
         else:
@@ -43,14 +46,14 @@ class DataLoader:
             self.tokenizer.add_tokens(
                 ["[E1]", "[/E1]", "[E2]", "[/E2]", "[BLANK]"]
             )
-            with open(tokenizer_path, 'wb') as output:
+            with open(tokenizer_path, "wb") as output:
                 joblib.dump(self.tokenizer, output)
 
             logger.info("Saved ALBERT tokenizer at {0}".format(tokenizer_path))
         e1_id = self.tokenizer.convert_tokens_to_ids("[E1]")
         e2_id = self.tokenizer.convert_tokens_to_ids("[E2]")
-        if not e1_id != e2_id != 1:
-            raise ValueError("E1 token == E2 token == 1")
+        if e1_id == e2_id:
+            raise ValueError("E1 token equals E2 token")
 
         self.cls_token = self.tokenizer.cls_token
         self.sep_token = self.tokenizer.sep_token
@@ -62,7 +65,9 @@ class DataLoader:
 
         self.normalizer = Normalizer("en", config.get("normalization", []))
         self.data = self.load_dataset()
-        self.train_generator = PretrainDataset(self.data, batch_size=self.config.get("batch_size"))
+        self.train_generator = PretrainDataset(
+            self.data, batch_size=self.config.get("batch_size")
+        )
 
         self.batch_size = config.get("batch_size")
         self.alpha = 0.7
@@ -131,6 +136,14 @@ class DataLoader:
         return data
 
     def preprocess(self, data: pd.DataFrame):
+        """
+        Preprocess the dataset.
+
+        Normalizes the dataset, tokenizes it and add special tokens
+
+        Args:
+            data: dataset to preprocess
+        """
         logger.info("Normalizing relations")
         normalized_relations = []
         for _idx, row in data.iterrows():
@@ -143,8 +156,10 @@ class DataLoader:
             for n in normalized_relations
         ]
         tokenized_relations = pad_sequence(
-                tokenized_relations, batch_first=True, padding_value=self.pad_token_id
-            )
+            tokenized_relations,
+            batch_first=True,
+            padding_value=self.pad_token_id,
+        )
         e_span1 = [(r[1][0] + 2, r[1][1] + 2) for r in data["r"]]
         e_span2 = [(r[2][0] + 4, r[2][1] + 4) for r in data["r"]]
         r = [
@@ -271,78 +286,73 @@ class DataLoader:
         length_doc = len(sents_doc)
         data = []
         ents_list = []
-        for e1_id, e1 in tqdm(enumerate(ents)):
+        for e1, e2 in tqdm(itertools.product(ents, ents)):
+            if e1 == e2:
+                continue
             e1start = e1.start
             e1end = e1.end
+            e2start = e2.start
+            e2end = e2.end
             e1_has_numbers = re.search("[\d+]", e1.text)
+            e2_has_numbers = re.search("[\d+]", e2.text)
             if (e1.label_ not in entities_of_interest) or e1_has_numbers:
                 continue
-            for e2_id, e2 in enumerate(ents):
-                if e1 == e2:
+            if (e2.label_ not in entities_of_interest) or e2_has_numbers:
+                continue
+            if e1.text.lower() == e2.text.lower():  # make sure e1 != e2
+                continue
+            # check if next nearest entity within window_size
+            if 1 <= (e2start - e1end) <= window_size:
+                # Find start of sentence
+                punc_token = False
+                start = e1start - 1
+                if start > 0:
+                    while not punc_token:
+                        punc_token = sents_doc[start].is_punct
+                        start -= 1
+                        if start < 0:
+                            break
+                    left_r = start + 2 if start > 0 else 0
+                else:
+                    left_r = 0
+
+                # Find end of sentence
+                punc_token = False
+                start = e2end
+                if start < length_doc:
+                    while not punc_token:
+                        punc_token = sents_doc[start].is_punct
+                        start += 1
+                        if start == length_doc:
+                            break
+                    right_r = start if start < length_doc else length_doc
+                else:
+                    right_r = length_doc
+                # sentence should not be longer than window_size
+                if (right_r - left_r) > window_size:
                     continue
-                e2start = e2.start
-                e2end = e2.end
-                e2_has_numbers = re.search("[\d+]", e2.text)
-                if (e2.label_ not in entities_of_interest) or e2_has_numbers:
-                    continue
-                if e1.text.lower() == e2.text.lower():  # make sure e1 != e2
-                    continue
 
-                if (
-                    1 <= (e2start - e1end) <= window_size
-                ):  # check if next nearest entity within window_size
-                    # Find start of sentence
-                    punc_token = False
-                    start = e1start - 1
-                    if start > 0:
-                        while not punc_token:
-                            punc_token = sents_doc[start].is_punct
-                            start -= 1
-                            if start < 0:
-                                break
-                        left_r = start + 2 if start > 0 else 0
-                    else:
-                        left_r = 0
+                x = [token.text for token in sents_doc[left_r:right_r]]
 
-                    # Find end of sentence
-                    punc_token = False
-                    start = e2end
-                    if start < length_doc:
-                        while not punc_token:
-                            punc_token = sents_doc[start].is_punct
-                            start += 1
-                            if start == length_doc:
-                                break
-                        right_r = start if start < length_doc else length_doc
-                    else:
-                        right_r = length_doc
+                empty_token = all(not token for token in x)
+                emtpy_e1 = not e1.text
+                emtpy_e2 = not e2.text
+                emtpy_span = (e2start - e1end) < 1
+                if emtpy_e1 or emtpy_e2 or emtpy_span or empty_token:
+                    raise ValueError("Relation has wrong format")
 
-                    if (
-                        right_r - left_r
-                    ) > window_size:  # sentence should not be longer than window_size
-                        continue
-
-                    x = [token.text for token in sents_doc[left_r:right_r]]
-
-                    empty_token = any(len(token) < 1 for token in x)
-                    emtpy_e1 = len(e1.text) < 1
-                    emtpy_e2 = len(e2.text) < 1
-                    emtpy_span = (e2start - e1end) < 1
-                    if emtpy_e1 or emtpy_e2 or emtpy_span or empty_token:
-                        raise ValueError("Relation has wrong format")
-
-                    r = (
-                        x,
-                        (e1start - left_r, e1end - left_r),
-                        (e2start - left_r, e2end - left_r),
-                    )
-                    data.append((r, e1.text, e2.text))
-                    ents_list.append((e1.text, e2.text))
+                r = (
+                    x,
+                    (e1start - left_r, e1end - left_r),
+                    (e2start - left_r, e2end - left_r),
+                )
+                data.append((r, e1.text, e2.text))
+                ents_list.append((e1.text, e2.text))
 
         logger.info(
             "Processing relation statements by dependency tree parsing..."
         )
-        doc_sents = [s for s in sents_doc.sents]
+        doc_sents = list(sents_doc.sents)
         for sent_ in tqdm(doc_sents, total=len(doc_sents)):
             if len(sent_) > (window_size + 1):
                 continue
@@ -401,7 +411,7 @@ class PretrainDataset(Dataset):
 
         tokenizer_path = "data/ALBERT_tokenizer.pkl"
         if os.path.isfile(tokenizer_path):
-            with open(tokenizer_path, 'rb') as pkl_file:
+            with open(tokenizer_path, "rb") as pkl_file:
                 self.tokenizer = joblib.load(pkl_file)
             logger.info("Loaded tokenizer from saved path.")
         else:
@@ -411,7 +421,7 @@ class PretrainDataset(Dataset):
             self.tokenizer.add_tokens(
                 ["[E1]", "[/E1]", "[E2]", "[/E2]", "[BLANK]"]
             )
-            with open(tokenizer_path, 'wb') as output:
+            with open(tokenizer_path, "wb") as output:
                 joblib.dump(self.tokenizer, output)
 
             logger.info("Saved ALBERT tokenizer at {0}".format(tokenizer_path))
@@ -533,16 +543,14 @@ class PretrainDataset(Dataset):
 
         x = self.tokenizer.convert_tokens_to_ids(x)
         masked_for_pred = self.tokenizer.convert_tokens_to_ids(masked_for_pred)
-        return x, masked_for_pred, e1_e2_start  # , e1, e2
+        return x, masked_for_pred, e1_e2_start
 
     def __len__(self):
         return len(self.df)
 
     def __getitem__(self, idx):
         r, e1, e2 = self.df.iloc[idx]  # positive sample
-        pool = self.df[
-            ((self.df["e1"] == e1) & (self.df["e2"] == e2))
-        ].index
+        pool = self.df[((self.df["e1"] == e1) & (self.df["e2"] == e2))].index
         pool = pool.append(
             self.df[((self.df["e1"] == e2) & (self.df["e2"] == e1))].index
         )
