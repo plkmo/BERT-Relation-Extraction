@@ -1,0 +1,6 @@
+boto3
+matplotlib
+pandas
+spacy
+torch 
+transformers
