@@ -60,7 +60,7 @@ def load_tf_weights_in_bert(model, config, tf_checkpoint_path):
         import tensorflow as tf
     except ImportError:
         logger.error("Loading a TensorFlow model in PyTorch, requires TensorFlow to be installed. Please see "
-            "https://www.tensorflow.org/install/ for installation instructions.")
+                     "https://www.tensorflow.org/install/ for installation instructions.")
         raise
     tf_path = os.path.abspath(tf_checkpoint_path)
     logger.info("Converting TensorFlow checkpoint from {}".format(tf_path))
@@ -147,6 +147,7 @@ BertLayerNorm = torch.nn.LayerNorm
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
     """
+
     def __init__(self, config):
         super(BertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
@@ -480,6 +481,7 @@ class BertPreTrainedModel(PreTrainedModel):
     """
     config_class = BertConfig
     pretrained_model_archive_map = BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+
     load_tf_weights = load_tf_weights_in_bert
     base_model_prefix = "bert"
 
@@ -571,6 +573,7 @@ BERT_INPUTS_DOCSTRING = r"""
             ``1`` for tokens that are NOT MASKED, ``0`` for MASKED tokens.
 """
 
+
 @add_start_docstrings("The bare Bert Model transformer outputting raw hidden-states without any specific head on top.",
                       BERT_START_DOCSTRING, BERT_INPUTS_DOCSTRING)
 class BertModel(BertPreTrainedModel):
@@ -602,10 +605,11 @@ class BertModel(BertPreTrainedModel):
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
     """
+
     def __init__(self, config, model_size, task=None, n_classes_=None):
         super(BertModel, self).__init__(config)
         self.config = config
-        
+
         self.task = task
         self.model_size = model_size
         self.embeddings = BertEmbeddings(config)
@@ -613,7 +617,7 @@ class BertModel(BertPreTrainedModel):
         self.pooler = BertPooler(config)
 
         self.init_weights()
-        
+
         print("Model config: ", self.config)
         if self.task is None:
             ### blanks head ###
@@ -630,7 +634,7 @@ class BertModel(BertPreTrainedModel):
                 self.classification_layer = nn.Linear(1536, n_classes_)
             elif self.model_size == 'bert-large-uncased':
                 self.classification_layer = nn.Linear(2048, n_classes_)
-            
+
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -646,7 +650,7 @@ class BertModel(BertPreTrainedModel):
             self.encoder.layer[layer].attention.prune_heads(heads)
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None,
-                head_mask=None, inputs_embeds=None, encoder_hidden_states=None, encoder_attention_mask=None, \
+                head_mask=None, inputs_embeds=None, encoder_hidden_states=None, encoder_attention_mask=None,
                 Q=None, e1_e2_start=None):
         """ Forward pass on the Model.
 
@@ -739,20 +743,20 @@ class BertModel(BertPreTrainedModel):
                                        encoder_attention_mask=encoder_extended_attention_mask)
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
-        
+
         ### two heads: LM and blanks ###
         blankv1v2 = sequence_output[:, e1_e2_start, :]
         buffer = []
-        for i in range(blankv1v2.shape[0]): # iterate batch & collect
+        for i in range(blankv1v2.shape[0]):  # iterate batch & collect
             v1v2 = blankv1v2[i, i, :, :]
             v1v2 = torch.cat((v1v2[0], v1v2[1]))
             buffer.append(v1v2)
         del blankv1v2
         v1v2 = torch.stack([a for a in buffer], dim=0)
         del buffer
-        
+
         if self.task is None:
-            blanks_logits = self.activation(v1v2) # self.blanks_linear(- torch.log(Q)
+            blanks_logits = self.activation(v1v2)  # self.blanks_linear(- torch.log(Q)
             lm_logits = self.cls(sequence_output)
             return blanks_logits, lm_logits
         elif self.task == 'classification':
@@ -761,8 +765,7 @@ class BertModel(BertPreTrainedModel):
         elif self.task == 'fewrel':
             return v1v2
 
-        #outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
-        
+        # outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
 
 
 @add_start_docstrings("""Bert Model with two heads on top as done during the pre-training:
@@ -806,6 +809,7 @@ class BertForPreTraining(BertPreTrainedModel):
         prediction_scores, seq_relationship_scores = outputs[:2]
 
     """
+
     def __init__(self, config):
         super(BertForPreTraining, self).__init__(config)
 
@@ -882,6 +886,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         loss, prediction_scores = outputs[:2]
 
     """
+
     def __init__(self, config):
         super(BertForMaskedLM, self).__init__(config)
 
@@ -965,6 +970,7 @@ class BertForNextSentencePrediction(BertPreTrainedModel):
         seq_relationship_scores = outputs[0]
 
     """
+
     def __init__(self, config):
         super(BertForNextSentencePrediction, self).__init__(config)
 
@@ -1031,6 +1037,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
         loss, logits = outputs[:2]
 
     """
+
     def __init__(self, config):
         super(BertForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
@@ -1107,6 +1114,7 @@ class BertForMultipleChoice(BertPreTrainedModel):
         loss, classification_scores = outputs[:2]
 
     """
+
     def __init__(self, config):
         super(BertForMultipleChoice, self).__init__(config)
 
@@ -1181,6 +1189,7 @@ class BertForTokenClassification(BertPreTrainedModel):
         loss, scores = outputs[:2]
 
     """
+
     def __init__(self, config):
         super(BertForTokenClassification, self).__init__(config)
         self.num_labels = config.num_labels
@@ -1267,6 +1276,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
 
 
     """
+
     def __init__(self, config):
         super(BertForQuestionAnswering, self).__init__(config)
         self.num_labels = config.num_labels
