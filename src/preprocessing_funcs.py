@@ -15,7 +15,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
-from .misc import save_as_pickle, load_pickle, get_subject_objects
+from .misc import save_as_pickle_to_data_folder, load_pickle_from_data_folder, get_subject_objects
 from tqdm import tqdm
 import logging
 
@@ -27,9 +27,9 @@ logger = logging.getLogger('__file__')
 
 def load_dataloaders(args, max_length: int = 50000):
 
-    cached_pretrain_data_path: str = f'./data/D.{args.pretrain_data.split("/")[-1]}.pkl'
+    cached_pretrain_data_filename: str = f'D.{args.pretrain_data.split("/")[-1]}.pkl'
 
-    if not os.path.isfile(cached_pretrain_data_path):
+    if not os.path.isfile(f'./data/{cached_pretrain_data_filename}'):
         logger.info("Loading pre-training data...")
         with open(args.pretrain_data, "r", encoding="utf8") as f:
             texts: List[str] = f.readlines()
@@ -49,11 +49,12 @@ def load_dataloaders(args, max_length: int = 50000):
             D.extend(create_pretraining_corpus(text_chunk, window_size=40, spacy_model_name=args.spacy_model_name))
 
         logger.info("Total number of relation statements in pre-training corpus: %d" % len(D))
-        save_as_pickle(cached_pretrain_data_path, D)
-        logger.info("Saved pre-training corpus to %s" % "./data/D.pkl")
+
+        save_as_pickle_to_data_folder(cached_pretrain_data_filename, D)
+        logger.info(f"Saved pre-training corpus to ./data/{cached_pretrain_data_filename}")
     else:
-        logger.info(f"Loaded pre-training data from saved file: {cached_pretrain_data_path}")
-        D = load_pickle(cached_pretrain_data_path)
+        logger.info(f"Loaded pre-training data from saved file: ./data/{cached_pretrain_data_filename}")
+        D = load_pickle_from_data_folder(cached_pretrain_data_filename)
 
     train_set = PretrainDataset(args, D, batch_size=args.batch_size)
     train_length = len(train_set)
@@ -289,7 +290,7 @@ class PretrainDataset(Dataset):
         tokenizer_path = './data/%s_tokenizer.pkl' % (model_name)
 
         if os.path.isfile(tokenizer_path):
-            self.tokenizer = load_pickle('%s_tokenizer.pkl' % (model_name))
+            self.tokenizer = load_pickle_from_data_folder('%s_tokenizer.pkl' % (model_name))
             logger.info("Loaded tokenizer from saved path.")
         else:
             if args.model_type == 'BioBERT':
@@ -298,7 +299,7 @@ class PretrainDataset(Dataset):
             else:
                 self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
             self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
-            save_as_pickle("%s_tokenizer.pkl" % (model_name), self.tokenizer)
+            save_as_pickle_to_data_folder("%s_tokenizer.pkl" % (model_name), self.tokenizer)
             logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
 
         e1_id = self.tokenizer.convert_tokens_to_ids('[E1]')

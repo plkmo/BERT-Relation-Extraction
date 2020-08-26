@@ -15,7 +15,7 @@ import re
 from itertools import permutations
 from tqdm import tqdm
 from .preprocessing_funcs import load_dataloaders
-from ..misc import save_as_pickle
+from ..misc import save_as_pickle_to_data_folder
 
 import logging
 
@@ -25,7 +25,7 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s',
 logger = logging.getLogger('__file__')
 
 
-def load_pickle(filename):
+def load_pickle_from_data_folder(filename):
     completeName = os.path.join("./data/",
                                 filename)
     with open(completeName, 'rb') as pkl_file:
@@ -36,7 +36,7 @@ def load_pickle(filename):
 class infer_from_trained(object):
     def __init__(self, args=None, detect_entities=False):
         if args is None:
-            self.args = load_pickle("args.pkl")
+            self.args = load_pickle_from_data_folder("args.pkl")
         else:
             self.args = args
         self.cuda = torch.cuda.is_available()
@@ -81,7 +81,7 @@ class infer_from_trained(object):
                                                  task='classification',
                                                  n_classes_=self.args.num_classes)
 
-        self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+        self.tokenizer = load_pickle_from_data_folder("%s_tokenizer.pkl" % model_name)
         self.net.resize_token_embeddings(len(self.tokenizer))
         if self.cuda:
             self.net.cuda()
@@ -91,7 +91,7 @@ class infer_from_trained(object):
         self.e1_id = self.tokenizer.convert_tokens_to_ids('[E1]')
         self.e2_id = self.tokenizer.convert_tokens_to_ids('[E2]')
         self.pad_id = self.tokenizer.pad_token_id
-        self.rm = load_pickle("relations.pkl")
+        self.rm = load_pickle_from_data_folder("relations.pkl")
 
     def get_all_ent_pairs(self, sent):
         if isinstance(sent, str):
@@ -229,7 +229,7 @@ class infer_from_trained(object):
 class FewRel(object):
     def __init__(self, args=None):
         if args is None:
-            self.args = load_pickle("args.pkl")
+            self.args = load_pickle_from_data_folder("args.pkl")
         else:
             self.args = args
         self.cuda = torch.cuda.is_available()
@@ -266,7 +266,7 @@ class FewRel(object):
                                                  task='fewrel')
 
         if os.path.isfile('./data/%s_tokenizer.pkl' % model_name):
-            self.tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+            self.tokenizer = load_pickle_from_data_folder("%s_tokenizer.pkl" % model_name)
             logger.info("Loaded tokenizer from saved file.")
         else:
             logger.info("Saved tokenizer not found, initializing new tokenizer...")
@@ -276,7 +276,7 @@ class FewRel(object):
             else:
                 self.tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
             self.tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
-            save_as_pickle("%s_tokenizer.pkl" % model_name, self.tokenizer)
+            save_as_pickle_to_data_folder("%s_tokenizer.pkl" % model_name, self.tokenizer)
             logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" % (model_name, model_name))
 
         self.net.resize_token_embeddings(len(self.tokenizer))

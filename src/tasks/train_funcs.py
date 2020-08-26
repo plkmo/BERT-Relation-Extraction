@@ -9,7 +9,7 @@ import os
 import math
 import torch
 import torch.nn as nn
-from ..misc import save_as_pickle, load_pickle
+from ..misc import save_as_pickle_to_data_folder, load_pickle_from_data_folder
 from seqeval.metrics import precision_score, recall_score, f1_score
 import logging
 from tqdm import tqdm
@@ -51,9 +51,9 @@ def load_results(model_type=0):
     accuracy_path = "./data/task_train_accuracy_per_epoch_%d.pkl" % model_type
     f1_path = "./data/task_test_f1_per_epoch_%d.pkl" % model_type
     if os.path.isfile(losses_path) and os.path.isfile(accuracy_path) and os.path.isfile(f1_path):
-        losses_per_epoch = load_pickle("task_test_losses_per_epoch_%d.pkl" % model_type)
-        accuracy_per_epoch = load_pickle("task_train_accuracy_per_epoch_%d.pkl" % model_type)
-        f1_per_epoch = load_pickle("task_test_f1_per_epoch_%d.pkl" % model_type)
+        losses_per_epoch = load_pickle_from_data_folder("task_test_losses_per_epoch_%d.pkl" % model_type)
+        accuracy_per_epoch = load_pickle_from_data_folder("task_train_accuracy_per_epoch_%d.pkl" % model_type)
+        f1_per_epoch = load_pickle_from_data_folder("task_test_f1_per_epoch_%d.pkl" % model_type)
         logger.info("Loaded results buffer")
     else:
         losses_per_epoch, accuracy_per_epoch, f1_per_epoch = [], [], []

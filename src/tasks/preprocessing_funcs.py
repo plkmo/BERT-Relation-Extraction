@@ -14,7 +14,7 @@ import json
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from ..misc import save_as_pickle, load_pickle
+from ..misc import save_as_pickle_to_data_folder, load_pickle_from_data_folder
 from tqdm import tqdm
 import logging
 
@@ -68,11 +68,11 @@ def preprocess_semeval2010_8(args):
     df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
     
     rm = Relations_Mapper(df_train['relations'])
-    save_as_pickle('relations.pkl', rm)
+    save_as_pickle_to_data_folder('relations.pkl', rm)
     df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
     df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-    save_as_pickle('df_train.pkl', df_train)
-    save_as_pickle('df_test.pkl', df_test)
+    save_as_pickle_to_data_folder('df_train.pkl', df_train)
+    save_as_pickle_to_data_folder('df_test.pkl', df_test)
     logger.info("Finished and saved!")
     
     return df_train, df_test, rm
@@ -218,7 +218,7 @@ def preprocess_fewrel(args, do_lower_case=True):
     df_test = pd.DataFrame(data={'sents': test_sents, 'labels': test_labels})
     
     rm = Relations_Mapper(list(df_train['labels'].unique()))
-    save_as_pickle('relations.pkl', rm)
+    save_as_pickle_to_data_folder('relations.pkl', rm)
     df_train['labels'] = df_train.progress_apply(lambda x: rm.rel2idx[x['labels']], axis=1)
     
     return df_train, df_test
@@ -305,7 +305,7 @@ def load_dataloaders(args):
         model_name = 'BioBERT'
         
     if os.path.isfile("./data/%s_tokenizer.pkl" % model_name):
-        tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+        tokenizer = load_pickle_from_data_folder("%s_tokenizer.pkl" % model_name)
         logger.info("Loaded tokenizer from pre-trained blanks model")
     else:
         logger.info("Pre-trained blanks tokenizer not found, initializing new tokenizer...")
@@ -316,7 +316,7 @@ def load_dataloaders(args):
             tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
         tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
 
-        save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer)
+        save_as_pickle_to_data_folder("%s_tokenizer.pkl" % model_name, tokenizer)
         logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" %(model_name, model_name))
     
     e1_id = tokenizer.convert_tokens_to_ids('[E1]')
@@ -328,9 +328,9 @@ def load_dataloaders(args):
         train_path = './data/df_train.pkl'
         test_path = './data/df_test.pkl'
         if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path):
-            rm = load_pickle('relations.pkl')
-            df_train = load_pickle('df_train.pkl')
-            df_test = load_pickle('df_test.pkl')
+            rm = load_pickle_from_data_folder('relations.pkl')
+            df_train = load_pickle_from_data_folder('df_train.pkl')
+            df_test = load_pickle_from_data_folder('df_test.pkl')
             logger.info("Loaded preproccessed data.")
         else:
             df_train, df_test, rm = preprocess_semeval2010_8(args)

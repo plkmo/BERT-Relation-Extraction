@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 from .preprocessing_funcs import load_dataloaders
 from .train_funcs import Two_Headed_Loss, load_state, load_results, evaluate_
-from .misc import save_as_pickle, load_pickle
+from .misc import save_as_pickle_to_data_folder, load_pickle_from_data_folder
 import matplotlib.pyplot as plt
 import time
 import logging
@@ -56,7 +56,7 @@ def train_and_fit(args):
                                         force_download=False,
                                         model_size='bert-base-uncased')
 
-    tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+    tokenizer = load_pickle_from_data_folder("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer))
     e1_id = tokenizer.convert_tokens_to_ids('[E1]')
     e2_id = tokenizer.convert_tokens_to_ids('[E2]')
@@ -201,9 +201,9 @@ def train_and_fit(args):
             }, os.path.join("./data/", "test_model_best_%d.pth.tar" % args.model_type))
 
         if (epoch % 1) == 0:
-            save_as_pickle("test_losses_per_epoch_%d.pkl" %
+            save_as_pickle_to_data_folder("test_losses_per_epoch_%d.pkl" %
                            args.model_type, losses_per_epoch)
-            save_as_pickle("test_accuracy_per_epoch_%d.pkl" %
+            save_as_pickle_to_data_folder("test_accuracy_per_epoch_%d.pkl" %
                            args.model_type, accuracy_per_epoch)
             torch.save({
                 'epoch': epoch + 1,

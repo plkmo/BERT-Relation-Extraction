@@ -10,7 +10,7 @@ import re
 from itertools import permutations
 
 
-def load_pickle(filename):
+def load_pickle_from_data_folder(filename):
     completeName = os.path.join("./data/",
                                 filename)
     with open(completeName, 'rb') as pkl_file:
@@ -18,7 +18,7 @@ def load_pickle(filename):
     return data
 
 
-def save_as_pickle(filename, data):
+def save_as_pickle_to_data_folder(filename, data):
     completeName = os.path.join("./data/",
                                 filename)
     with open(completeName, 'wb') as output:

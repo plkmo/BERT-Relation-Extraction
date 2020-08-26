@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 from .preprocessing_funcs import load_dataloaders
 from .train_funcs import load_state, load_results, evaluate_, evaluate_results
-from ..misc import save_as_pickle, load_pickle
+from ..misc import save_as_pickle_to_data_folder, load_pickle_from_data_folder
 import matplotlib.pyplot as plt
 import time
 import logging
@@ -64,7 +64,7 @@ def train_and_fit(args):
                                           task='classification' if args.task != 'fewrel' else 'fewrel',\
                                           n_classes_=args.num_classes)
     
-    tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+    tokenizer = load_pickle_from_data_folder("%s_tokenizer.pkl" % model_name)
     net.resize_token_embeddings(len(tokenizer))
     e1_id = tokenizer.convert_tokens_to_ids('[E1]')
     e2_id = tokenizer.convert_tokens_to_ids('[E2]')
@@ -195,9 +195,9 @@ def train_and_fit(args):
                 }, os.path.join("./data/" , "task_test_model_best_%d.pth.tar" % args.model_type))
         
         if (epoch % 1) == 0:
-            save_as_pickle("task_test_losses_per_epoch_%d.pkl" % args.model_type, losses_per_epoch)
-            save_as_pickle("task_train_accuracy_per_epoch_%d.pkl" % args.model_type, accuracy_per_epoch)
-            save_as_pickle("task_test_f1_per_epoch_%d.pkl" % args.model_type, test_f1_per_epoch)
+            save_as_pickle_to_data_folder("task_test_losses_per_epoch_%d.pkl" % args.model_type, losses_per_epoch)
+            save_as_pickle_to_data_folder("task_train_accuracy_per_epoch_%d.pkl" % args.model_type, accuracy_per_epoch)
+            save_as_pickle_to_data_folder("task_test_f1_per_epoch_%d.pkl" % args.model_type, test_f1_per_epoch)
             torch.save({
                     'epoch': epoch + 1,\
                     'state_dict': net.state_dict(),\

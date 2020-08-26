@@ -9,7 +9,7 @@ import os
 import torch
 import torch.nn as nn
 from itertools import combinations
-from .misc import load_pickle
+from .misc import load_pickle_from_data_folder
 import logging
 
 
@@ -127,8 +127,8 @@ def load_results(model_type=0):
     losses_path = f"./data/test_losses_per_epoch_{model_type}.pkl"
     accuracy_path = f"./data/test_accuracy_per_epoch_{model_type}.pkl"
     if os.path.isfile(losses_path) and os.path.isfile(accuracy_path):
-        losses_per_epoch = load_pickle(f"test_losses_per_epoch_{model_type}.pkl")
-        accuracy_per_epoch = load_pickle(f"test_accuracy_per_epoch_{model_type}.pkl")
+        losses_per_epoch = load_pickle_from_data_folder(f"test_losses_per_epoch_{model_type}.pkl")
+        accuracy_per_epoch = load_pickle_from_data_folder(f"test_accuracy_per_epoch_{model_type}.pkl")
         logger.info("Loaded results buffer")
     else:
         losses_per_epoch, accuracy_per_epoch = [], []
