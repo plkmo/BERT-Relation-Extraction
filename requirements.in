@@ -2,5 +2,6 @@ boto3
 matplotlib
 pandas
 spacy
+tensorflow
 torch 
 transformers
