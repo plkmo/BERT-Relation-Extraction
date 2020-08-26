@@ -100,16 +100,16 @@ def load_state(net, optimizer, scheduler, args, load_best=False):
     """ Loads saved model and optimizer states if exists """
     base_path = "./data/"
     amp_checkpoint = None
-    checkpoint_path = os.path.join(base_path, "test_checkpoint_%d.pth.tar" % args.model_no)
-    best_path = os.path.join(base_path, "test_model_best_%d.pth.tar" % args.model_no)
+    checkpoint_path = os.path.join(base_path, f"test_checkpoint_{ args.model_type}.pth.tar")
+    best_path = os.path.join(base_path, f"test_model_best_{ args.model_type}.pth.tar")
     start_epoch, best_pred, checkpoint = 0, 0, None
-    if (load_best == True) and os.path.isfile(best_path):
+    if (load_best is True) and os.path.isfile(best_path):
         checkpoint = torch.load(best_path)
         logger.info("Loaded best model.")
     elif os.path.isfile(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         logger.info("Loaded checkpoint model.")
-    if checkpoint != None:
+    if checkpoint is not None:
         start_epoch = checkpoint['epoch']
         best_pred = checkpoint['best_acc']
         net.load_state_dict(checkpoint['state_dict'])
@@ -122,13 +122,13 @@ def load_state(net, optimizer, scheduler, args, load_best=False):
     return start_epoch, best_pred, amp_checkpoint
 
 
-def load_results(model_no=0):
+def load_results(model_type=0):
     """ Loads saved results if exists """
-    losses_path = "./data/test_losses_per_epoch_%d.pkl" % model_no
-    accuracy_path = "./data/test_accuracy_per_epoch_%d.pkl" % model_no
+    losses_path = f"./data/test_losses_per_epoch_{model_type}.pkl"
+    accuracy_path = f"./data/test_accuracy_per_epoch_{model_type}.pkl"
     if os.path.isfile(losses_path) and os.path.isfile(accuracy_path):
-        losses_per_epoch = load_pickle("test_losses_per_epoch_%d.pkl" % model_no)
-        accuracy_per_epoch = load_pickle("test_accuracy_per_epoch_%d.pkl" % model_no)
+        losses_per_epoch = load_pickle(f"test_losses_per_epoch_{model_type}.pkl")
+        accuracy_per_epoch = load_pickle(f"test_accuracy_per_epoch_{model_type}.pkl")
         logger.info("Loaded results buffer")
     else:
         losses_per_epoch, accuracy_per_epoch = [], []

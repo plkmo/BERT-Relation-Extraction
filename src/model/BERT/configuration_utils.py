@@ -28,6 +28,7 @@ from .file_utils import cached_path, CONFIG_NAME
 
 logger = logging.getLogger(__name__)
 
+
 class PretrainedConfig(object):
     r""" Base class for all configuration classes.
         Handles a few parameters common to all models' configurations as well as methods for loading/downloading/saving configurations.
@@ -135,14 +136,11 @@ class PretrainedConfig(object):
         except EnvironmentError:
             if pretrained_model_name_or_path in cls.pretrained_config_archive_map:
                 msg = "Couldn't reach server at '{}' to download pretrained model configuration file.".format(
-                        config_file)
+                    config_file)
             else:
-                msg = "Model name '{}' was not found in model name list ({}). " \
-                      "We assumed '{}' was a path or url to a configuration file named {} or " \
-                      "a directory containing such a file but couldn't find any such file at this path or url.".format(
-                        pretrained_model_name_or_path,
-                        ', '.join(cls.pretrained_config_archive_map.keys()),
-                        config_file, CONFIG_NAME)
+                msg = f"Model name '{pretrained_model_name_or_path}' was not found in model name list ({', '.join(cls.pretrained_config_archive_map.keys())}). " \
+                      f"We assumed '{config_file}' was a path or url to a configuration file named {CONFIG_NAME} or " \
+                      f"a directory containing such a file but couldn't find any such file at this path or url."
             raise EnvironmentError(msg)
 
         if resolved_config_file == config_file:
