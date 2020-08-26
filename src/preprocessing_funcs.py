@@ -27,7 +27,9 @@ logger = logging.getLogger('__file__')
 
 def load_dataloaders(args, max_length: int = 50000):
 
-    if not os.path.isfile("./data/D.pkl"):
+    cached_pretrain_data_path: str = f'./data/D.{args.pretrain_data.split("/")[-1]}.pkl'
+
+    if not os.path.isfile(cached_pretrain_data_path):
         logger.info("Loading pre-training data...")
         with open(args.pretrain_data, "r", encoding="utf8") as f:
             texts: List[str] = f.readlines()
@@ -44,14 +46,14 @@ def load_dataloaders(args, max_length: int = 50000):
 
         text_chunk: str
         for text_chunk in tqdm(text_chunks, total=num_chunks):
-            D.extend(create_pretraining_corpus(text_chunk, window_size=40))
+            D.extend(create_pretraining_corpus(text_chunk, window_size=40, spacy_model_name=args.spacy_model_name))
 
         logger.info("Total number of relation statements in pre-training corpus: %d" % len(D))
-        save_as_pickle("D.pkl", D)
+        save_as_pickle(cached_pretrain_data_path, D)
         logger.info("Saved pre-training corpus to %s" % "./data/D.pkl")
     else:
-        logger.info("Loaded pre-training data from saved file")
-        D = load_pickle("D.pkl")
+        logger.info(f"Loaded pre-training data from saved file: {cached_pretrain_data_path}")
+        D = load_pickle(cached_pretrain_data_path)
 
     train_set = PretrainDataset(args, D, batch_size=args.batch_size)
     train_length = len(train_set)
@@ -95,13 +97,13 @@ RelationStatement = Tuple[List[str], Tuple[int, int], Tuple[int, int]]
 RelationStatementWithEntities = Tuple[RelationStatement, str, str]
 
 
-def create_pretraining_corpus(raw_text: str, window_size: int = 40):
+def create_pretraining_corpus(raw_text: str, window_size: int = 40, spacy_model_name: str = 'en_core_web_lg'):
     '''
     Input: Chunk of raw text
     Output: modified corpus of triplets (relation statement, entity1, entity2)
     '''
     logger.info("Processing sentences...")
-    nlp = spacy.load("en_core_web_lg")
+    nlp = spacy.load(spacy_model_name)
 
     sents_doc: spacy.tokens.doc.Doc = nlp(raw_text)
     ents: Tuple[spacy.tokens.span.Span] = sents_doc.ents  # get entities
@@ -112,6 +114,7 @@ def create_pretraining_corpus(raw_text: str, window_size: int = 40):
 
     D: List[RelationStatement] = []
     ents_list = []
+
     for i in tqdm(range(len(ents))):
         e1: spacy.tokens.span.Span = ents[i]
 
@@ -205,16 +208,18 @@ def skip_entity(span: spacy.tokens.span.Span) -> bool:
                             "LANGUAGE",
                             "LAW",
                             "LOC",
+                            "MISC",
                             "NORP",
                             "ORG",
+                            "PER",
                             "PERSON",
                             "PRODUCT",
                             "WORK_OF_ART"]
 
     if span.label_ not in entities_of_interest:
         return True
-    if re.search("[\d+]", span.text):  # entities should not contain numbers
-        return True
+    # if re.search("[\d+]", span.text):  # entities should not contain numbers
+    #     return True
 
     return False
 
@@ -282,7 +287,7 @@ class PretrainDataset(Dataset):
             model_name = 'BioBERT'
 
         tokenizer_path = './data/%s_tokenizer.pkl' % (model_name)
-        
+
         if os.path.isfile(tokenizer_path):
             self.tokenizer = load_pickle('%s_tokenizer.pkl' % (model_name))
             logger.info("Loaded tokenizer from saved path.")
