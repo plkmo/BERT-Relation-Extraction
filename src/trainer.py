@@ -29,8 +29,6 @@ def train_and_fit(args):
     else:
         amp = None
 
-    cuda = torch.cuda.is_available()
-
     train_loader = load_dataloaders(args)
     train_len = len(train_loader)
     logger.info("Loaded %d pre-training samples." % train_len)
@@ -38,21 +36,18 @@ def train_and_fit(args):
     if args.model_type == 'BERT':
         from .model.BERT.modeling_bert import BertModel
         model = args.model_size  # 'bert-base-uncased'
-        lower_case = True
         model_name = 'BERT'
         net = BertModel.from_pretrained(model, force_download=False,
                                         model_size=args.model_size)
     elif args.model_type == 'ALBERT':
         from .model.ALBERT.modeling_albert import AlbertModel
         model = args.model_size  # 'albert-base-v2'
-        lower_case = False
         model_name = 'ALBERT'
         net = AlbertModel.from_pretrained(model, force_download=False,
                                           model_size=args.model_size)
     elif args.model_type == 'BioBERT':  # BioBert
         from .model.BERT.modeling_bert import BertModel, BertConfig
         model = 'bert-base-uncased'
-        lower_case = False
         model_name = 'BioBERT'
         config = BertConfig.from_pretrained(
             './additional_models/biobert_v1.1_pubmed/bert_config.json')
@@ -67,8 +62,12 @@ def train_and_fit(args):
     e2_id = tokenizer.convert_tokens_to_ids('[E2]')
     assert e1_id != e2_id != 1
 
+    cuda = torch.cuda.is_available()
     if cuda:
         net.cuda()
+        logger.info('using GPU')
+    else:
+        logger.info('GPU not available!!!')
 
     if args.freeze == 1:
         logger.info("FREEZING MOST HIDDEN LAYERS...")
