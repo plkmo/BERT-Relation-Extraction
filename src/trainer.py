@@ -198,13 +198,11 @@ def train_and_fit(args):
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'amp': amp.state_dict() if amp is not None else amp
-            }, os.path.join("./data/", "test_model_best_%d.pth.tar" % args.model_type))
+            }, os.path.join("./data/", f"test_model_best_{args.model_type}.pth.tar"))
 
         if (epoch % 1) == 0:
-            save_as_pickle_to_data_folder("test_losses_per_epoch_%d.pkl" %
-                           args.model_type, losses_per_epoch)
-            save_as_pickle_to_data_folder("test_accuracy_per_epoch_%d.pkl" %
-                           args.model_type, accuracy_per_epoch)
+            save_as_pickle_to_data_folder(f"test_losses_per_epoch_{args.model_type}.pkl", losses_per_epoch)
+            save_as_pickle_to_data_folder(f"test_accuracy_per_epoch_{args.model_type}.pkl", accuracy_per_epoch)
             torch.save({
                 'epoch': epoch + 1,
                 'state_dict': net.state_dict(),
@@ -212,7 +210,7 @@ def train_and_fit(args):
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'amp': amp.state_dict() if amp is not None else amp
-            }, os.path.join("./data/", "test_checkpoint_%d.pth.tar" % args.model_type))
+            }, os.path.join("./data/", f"test_checkpoint_{args.model_type}.pth.tar"))
 
     logger.info("Finished Training!")
     fig = plt.figure(figsize=(20, 20))
@@ -223,7 +221,7 @@ def train_and_fit(args):
     ax.set_ylabel("Training Loss per batch", fontsize=22)
     ax.set_title("Training Loss vs Epoch", fontsize=32)
     plt.savefig(os.path.join(
-        "./data/", "loss_vs_epoch_%d.png" % args.model_type))
+        "./data/", f"loss_vs_epoch_{args.model_type}.png"))
 
     fig2 = plt.figure(figsize=(20, 20))
     ax2 = fig2.add_subplot(111)
@@ -234,6 +232,6 @@ def train_and_fit(args):
     ax2.set_ylabel("Test Masked LM Accuracy", fontsize=22)
     ax2.set_title("Test Masked LM Accuracy vs Epoch", fontsize=32)
     plt.savefig(os.path.join(
-        "./data/", "accuracy_vs_epoch_%d.png" % args.model_type))
+        "./data/", f"accuracy_vs_epoch_{args.model_type}.png"))
 
     return net
