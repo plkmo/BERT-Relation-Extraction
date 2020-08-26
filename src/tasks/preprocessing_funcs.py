@@ -288,17 +288,17 @@ class fewrel_dataset(Dataset):
         return meta_input_padded, e1_e2_start, torch.LongTensor(meta_labels).squeeze()
 
 def load_dataloaders(args):
-    if args.model_no == 0:
+    if args.model_type == 'BERT':
         from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
         model = args.model_size#'bert-large-uncased' 'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
-    elif args.model_no == 1:
+    elif args.model_type == 'ALBERT':
         from ..model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
         model = args.model_size #'albert-base-v2'
         lower_case = True
         model_name = 'ALBERT'
-    elif args.model_no == 2:
+    elif args.model_type == 'BioBERT':
         from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
         model = 'bert-base-uncased'
         lower_case = False
@@ -309,7 +309,7 @@ def load_dataloaders(args):
         logger.info("Loaded tokenizer from pre-trained blanks model")
     else:
         logger.info("Pre-trained blanks tokenizer not found, initializing new tokenizer...")
-        if args.model_no == 2:
+        if args.model_type == 'BioBERT':
             tokenizer = Tokenizer(vocab_file='./additional_models/biobert_v1.1_pubmed/vocab.txt',
                                   do_lower_case=False)
         else:

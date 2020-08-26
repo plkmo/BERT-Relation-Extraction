@@ -35,21 +35,21 @@ def train_and_fit(args):
     train_len = len(train_loader)
     logger.info("Loaded %d pre-training samples." % train_len)
 
-    if args.model_no == 0:
-        from .model.BERT.modeling_bert import BertModel as Model
+    if args.model_type == 'BERT':
+        from .model.BERT.modeling_bert import BertModel
         model = args.model_size  # 'bert-base-uncased'
         lower_case = True
         model_name = 'BERT'
-        net = Model.from_pretrained(model, force_download=False,
-                                    model_size=args.model_size)
-    elif args.model_no == 1:
-        from .model.ALBERT.modeling_albert import AlbertModel as Model
+        net = BertModel.from_pretrained(model, force_download=False,
+                                        model_size=args.model_size)
+    elif args.model_type == 'ALBERT':
+        from .model.ALBERT.modeling_albert import AlbertModel
         model = args.model_size  # 'albert-base-v2'
         lower_case = False
         model_name = 'ALBERT'
-        net = Model.from_pretrained(model, force_download=False,
-                                    model_size=args.model_size)
-    elif args.model_no == 2:  # BioBert
+        net = AlbertModel.from_pretrained(model, force_download=False,
+                                          model_size=args.model_size)
+    elif args.model_type == 'BioBERT':  # BioBert
         from .model.BERT.modeling_bert import BertModel, BertConfig
         model = 'bert-base-uncased'
         lower_case = False
@@ -72,10 +72,10 @@ def train_and_fit(args):
 
     if args.freeze == 1:
         logger.info("FREEZING MOST HIDDEN LAYERS...")
-        if args.model_no == 0:
+        if args.model_type == 'BERT':
             unfrozen_layers = ["classifier", "pooler", "encoder.layer.11", "encoder.layer.10",
                                "encoder.layer.9", "blanks_linear", "lm_linear", "cls"]
-        elif args.model_no == 1:
+        elif args.model_type == 'ALBERT':
             unfrozen_layers = ["classifier", "pooler", "embeddings", "attention",
                                "blanks_linear", "lm_linear", "cls",
                                "albert_layer_groups.0.albert_layers.0.ffn"]
@@ -106,7 +106,7 @@ def train_and_fit(args):
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[2, 4, 6, 8, 12, 15, 18, 20, 22,
                                                                           24, 26, 30], gamma=0.8)
 
-    losses_per_epoch, accuracy_per_epoch = load_results(args.model_no)
+    losses_per_epoch, accuracy_per_epoch = load_results(args.model_type)
 
     logger.info("Starting training process...")
     pad_id = tokenizer.pad_token_id
@@ -199,13 +199,13 @@ def train_and_fit(args):
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'amp': amp.state_dict() if amp is not None else amp
-            }, os.path.join("./data/", "test_model_best_%d.pth.tar" % args.model_no))
+            }, os.path.join("./data/", "test_model_best_%d.pth.tar" % args.model_type))
 
         if (epoch % 1) == 0:
             save_as_pickle("test_losses_per_epoch_%d.pkl" %
-                           args.model_no, losses_per_epoch)
+                           args.model_type, losses_per_epoch)
             save_as_pickle("test_accuracy_per_epoch_%d.pkl" %
-                           args.model_no, accuracy_per_epoch)
+                           args.model_type, accuracy_per_epoch)
             torch.save({
                 'epoch': epoch + 1,
                 'state_dict': net.state_dict(),
@@ -213,7 +213,7 @@ def train_and_fit(args):
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'amp': amp.state_dict() if amp is not None else amp
-            }, os.path.join("./data/", "test_checkpoint_%d.pth.tar" % args.model_no))
+            }, os.path.join("./data/", "test_checkpoint_%d.pth.tar" % args.model_type))
 
     logger.info("Finished Training!")
     fig = plt.figure(figsize=(20, 20))
@@ -224,7 +224,7 @@ def train_and_fit(args):
     ax.set_ylabel("Training Loss per batch", fontsize=22)
     ax.set_title("Training Loss vs Epoch", fontsize=32)
     plt.savefig(os.path.join(
-        "./data/", "loss_vs_epoch_%d.png" % args.model_no))
+        "./data/", "loss_vs_epoch_%d.png" % args.model_type))
 
     fig2 = plt.figure(figsize=(20, 20))
     ax2 = fig2.add_subplot(111)
@@ -235,6 +235,6 @@ def train_and_fit(args):
     ax2.set_ylabel("Test Masked LM Accuracy", fontsize=22)
     ax2.set_title("Test Masked LM Accuracy vs Epoch", fontsize=32)
     plt.savefig(os.path.join(
-        "./data/", "accuracy_vs_epoch_%d.png" % args.model_no))
+        "./data/", "accuracy_vs_epoch_%d.png" % args.model_type))
 
     return net
