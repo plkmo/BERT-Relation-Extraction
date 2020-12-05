@@ -7,6 +7,8 @@ Additional models for relation extraction, implemented here based on the paper's
 - ALBERT (https://arxiv.org/abs/1909.11942)   
 - BioBERT (https://arxiv.org/abs/1901.08746)
 
+For more conceptual details on the implementation, please see https://towardsdatascience.com/bert-s-for-relation-extraction-in-nlp-2c7c3ab487c4
+
 ## Requirements
 Requirements: Python (3.6+), PyTorch (1.2.0+), Spacy (2.1.8+)  
 
