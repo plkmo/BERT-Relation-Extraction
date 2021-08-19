@@ -8,6 +8,7 @@ import os
 import pickle
 import re
 from itertools import permutations
+from pathlib import Path
 
 def load_pickle(filename):
     completeName = os.path.join("./data/",\
@@ -19,6 +20,7 @@ def load_pickle(filename):
 def save_as_pickle(filename, data):
     completeName = os.path.join("./data/",\
                                 filename)
+    Path.mkdir(Path(completeName).parent, exist_ok=True)
     with open(completeName, 'wb') as output:
         pickle.dump(data, output)
 
