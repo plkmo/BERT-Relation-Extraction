@@ -9,19 +9,26 @@ Additional models for relation extraction, implemented here based on the paper's
 
 For more conceptual details on the implementation, please see https://towardsdatascience.com/bert-s-for-relation-extraction-in-nlp-2c7c3ab487c4
 
+If you like my work, please consider sponsoring by clicking the sponsor button at the top.
+
 ## Requirements
-Requirements: Python (3.6+), PyTorch (1.2.0+), Spacy (2.1.8+)  
+Requirements: Python (3.8+)
+```bash
+python3 -m pip install -r requirements.txt
+python3 -m spacy download en_core_web_lg
+```
 
 Pre-trained BERT models (ALBERT, BERT) courtesy of HuggingFace.co (https://huggingface.co)   
 Pre-trained BioBERT model courtesy of https://github.com/dmis-lab/biobert   
 
-To use BioBERT(biobert_v1.1_pubmed), download & unzip the [contents](https://drive.google.com/file/d/1zKTBqqrCGlclb3zgBGGpq_70Fx-qFpiU/view?usp=sharing) to ./additional_models folder.   
+To use BioBERT(biobert_v1.1_pubmed), download & unzip the model from [here](https://github.com/dmis-lab/biobert) to ./additional_models folder.   
 
 ## Training by matching the blanks (BERT<sub>EM</sub> + MTB)
 Run main_pretraining.py with arguments below. Pre-training data can be any .txt continuous text file.  
 We use Spacy NLP to grab pairwise entities (within a window size of 40 tokens length) from the text to form relation statements for pre-training. Entities recognition are based on NER and dependency tree parsing of objects/subjects.  
 
 The pre-training data taken from CNN dataset (cnn.txt) that I've used can be downloaded [here.](https://drive.google.com/file/d/1aMiIZXLpO7JF-z_Zte3uH7OCo4Uk_0do/view?usp=sharing)   
+Download and save as ./data/cnn.txt   
 However, do note that the paper uses wiki dumps data for MTB pre-training which is much larger than the CNN dataset.   
 
 Note: Pre-training can take a long time, depending on available GPU. It is possible to directly fine-tune on the relation-extraction task and still get reasonable results, following the section below.  
